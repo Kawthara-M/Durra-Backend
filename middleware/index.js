@@ -76,7 +76,7 @@ const isJeweler = (req, res, next) => {
 }
 const isDeliveryMan = (req, res, next) => {
   const user = res.locals.payload
-  if (user && user.role === "DeliveryMan") {
+  if (user && user.role === "Driver") {
     return next()
   } else {
     return res.status(403).json({ error: "Access denied: Deliverymen only." })

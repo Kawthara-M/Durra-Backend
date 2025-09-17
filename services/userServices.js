@@ -3,6 +3,8 @@ const Shop = require("../models/Shop")
 const middleware = require("../middleware/index.js")
 const validatePassword = require("../validators/passwordValidator.js")
 
+// createUser is a service because its' reached by auth controller and shop controller
+// I should prevent admin direct signup, what if they use insomnia to signup, let's ask Ghadeer first
 async function createUser({ fName, lName, email, phone, password, role }) {
   if ((role === "Admin" || role === "Customer") && !password) {
     throw new Error("Password is required.")
@@ -20,7 +22,6 @@ async function createUser({ fName, lName, email, phone, password, role }) {
   if (existingUser) {
     throw new Error("A user with this email exists!")
   }
-  console.log("am here")
 
   let passwordDigest = ""
   if (password) {
@@ -38,13 +39,6 @@ async function createUser({ fName, lName, email, phone, password, role }) {
   return user
 }
 
-async function deleteUserAccount(userId) {
-  await Shop.deleteMany({ user: userId })
-  // TODO: Delete related data first if needed
-  await User.findByIdAndDelete(userId)
-}
-
 module.exports = {
   createUser,
-  deleteUserAccount,
 }

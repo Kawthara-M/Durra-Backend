@@ -1,5 +1,5 @@
 const router = require("express").Router()
-const orderCtrl = require("../controllers/orderController")
+const orderCtrl = require("../controllers/orderController.js")
 const middleware = require("../middleware")
 
 router.get(

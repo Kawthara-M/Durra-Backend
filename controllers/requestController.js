@@ -15,7 +15,7 @@ const getAllRequests = async (req, res) => {
 
     if (userRole === "Admin") {
       requests = await Request.find().populate("user")
-    } else if (userRole === "Jeweler") {
+    } else if (userRole === "Jeweler" || userRole === "Driver") {
       requests = await Request.find({ user: userId }).populate("user")
     } else {
       return res.status(403).json({ error: "Unauthorized to view requests." })
@@ -91,8 +91,8 @@ const updateRequest = async (req, res) => {
       return res.status(404).json({ error: "Request not found." })
     }
 
-    // tested
-    if (userRole === "Jeweler") {
+    // tested, test again for driver
+    if (userRole === "Jeweler" || userRole === "Driver") {
       if (request.user.toString() !== userId) {
         return res
           .status(403)
@@ -130,32 +130,6 @@ const updateRequest = async (req, res) => {
             ? JSON.parse(request.details)
             : request.details
 
-        // handle shop delete request, tested
-        if (request.action === "delete" && request.entity === "Shop") {
-          const { shopId } = parsedDetails
-          if (!shopId) {
-            return res
-              .status(400)
-              .json({ error: "No Shop ID provided for deletion." })
-          }
-          const shop = await Shop.findById(shopId)
-
-          await Shop.findByIdAndDelete(shopId)
-
-          const user = await User.findById(shop.user)
-          await User.findByIdAndDelete(user._id)
-
-          if (user && user.email) {
-            await sendEmail({
-              to: user.email,
-              subject: "Your Shop Has Been Deleted",
-              text: `Hello,\n\nYour shop has been successfully deleted as requested.\n\nRegards,\nDurra Team`,
-            })
-          }
-          request.status = "approved"
-          await request.save()
-        }
-
         //handle shop edit request, tested
         if (request.action === "edit" && request.entity === "Shop") {
           const { shopId, name, cr, description } = parsedDetails
@@ -188,7 +162,7 @@ const updateRequest = async (req, res) => {
           await request.save()
         }
 
-        // handle collection create, tested without jewelry
+        // handle collection create, tested
         if (request.action === "create" && request.entity === "Collection") {
           const { name, description, jewelry, shopId } = request.details
 
@@ -235,7 +209,7 @@ const updateRequest = async (req, res) => {
             .json({ message: "Collection deleted successfully." })
         }
 
-        // handle collection edit, tested without jewelry
+        // handle collection edit, tested without jewelry initiional errors
         if (request.action === "edit" && request.entity === "Collection") {
           const { collectionId, shopId, name, description, jewelry } =
             request.details
@@ -290,7 +264,7 @@ const updateRequest = async (req, res) => {
           })
         }
 
-        // handle jewelry add, tested, how are we going to handle DANAT thing
+        // handle jewelry add, tested, work on certification part and test again
         if (request.action === "create" && request.entity === "Jewelry") {
           const {
             name,
@@ -307,6 +281,8 @@ const updateRequest = async (req, res) => {
             shopId,
           } = request.details
           let { totalPrice } = request.details
+
+          console.log(preciousMaterials)
 
           let totalPreciousPrice = preciousMaterials.reduce((acc, material) => {
             const { karatCost, weight, productionCost } = material
@@ -331,6 +307,9 @@ const updateRequest = async (req, res) => {
             otherMaterials,
           })
 
+          request.status = "approved"
+          await request.save()
+
           return res.status(201).json({
             message: "Jewelry created successfully.",
             jewelry: newJewelry,
@@ -339,11 +318,9 @@ const updateRequest = async (req, res) => {
 
         // handle jewelry delete, tested
         if (request.action === "delete" && request.entity === "Jewelry") {
-          const { jewelryId, shopId } = request.details
+          const { jewelryId } = request.details
 
-          const jewelry = await Jewelry.findById({
-            jewelryId,
-          })
+          const jewelry = await Jewelry.findById(jewelryId)
 
           if (!jewelry) {
             return res.status(404).json({ error: "Jewelry not found." })
@@ -355,12 +332,14 @@ const updateRequest = async (req, res) => {
             collection.jewelry.pull(jewelryId)
           }
 
+          request.status = "approved"
+          await request.save()
           return res
             .status(200)
             .json({ message: "Jewelry deleted successfully." })
         }
 
-        // handle jewelry edit, tested
+        // handle jewelry edit, tested, lets test after certifications logic
         if (request.action === "edit" && request.entity === "Jewelry") {
           const {
             jewelryId,
@@ -377,6 +356,7 @@ const updateRequest = async (req, res) => {
             diamonds,
             otherMaterials,
             shopId,
+            certifications
           } = request.details
 
           const jewelry = await Jewelry.findOne({
@@ -400,6 +380,7 @@ const updateRequest = async (req, res) => {
           jewelry.pearls = pearls ?? jewelry.pearls
           jewelry.diamonds = diamonds ?? jewelry.diamonds
           jewelry.otherMaterials = otherMaterials ?? jewelry.otherMaterials
+          jewelry.certifications = otherMaterials ?? jewelry.certifications
 
           await jewelry.save()
 
@@ -443,8 +424,6 @@ Durra Team`
         .json({ message: `Request ${status} successfully.` })
     }
 
-    // if user isn't jeweler or admin, we should add statement for delivery man too?
-
     return res
       .status(403)
       .json({ error: "You are not authorized to update this request." })
@@ -454,11 +433,10 @@ Durra Team`
   }
 }
 
-// tested edit
+// tested: edit shop
 const createRequest = async (req, res) => {
   try {
     const userId = res.locals.payload.id
-
     const { action, entity, details } = req.body
 
     if (typeof details === "string") {

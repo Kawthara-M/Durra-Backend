@@ -39,9 +39,11 @@ const authRouter = require("./routes/authRouter")
 const userRouter = require("./routes/userRouter")
 const requestRouter = require("./routes/requestRouter")
 const shopRouter = require("./routes/shopRouter")
-const jewelryRouter = require("./routes/shopRouter")
+const jewelryRouter = require("./routes/jewelryRouter")
 const collectionRouter = require("./routes/collectionRouter")
-// cont orderRouter = require("./routes/orderRouter")
+const orderRouter = require("./routes/orderRouter")
+const addressRouter = require("./routes/addressRouter")
+// const deliveryRouter = require("./routes/deliveryRouter")
 
 // use Routers
 app.use("/auth", authRouter)
@@ -50,7 +52,9 @@ app.use("/requests", requestRouter)
 app.use("/shops", shopRouter)
 app.use("/jewelry", jewelryRouter)
 app.use("/collections", collectionRouter)
-// app.use("/orders", orderRouter)
+app.use("/orders", orderRouter)
+app.use("/addresses", addressRouter)
+// app.use("drivers", deliveryRouter)
 
 // Listener
 app.listen(port, () => {

@@ -2,7 +2,6 @@ const router = require("express").Router()
 const authCtrl = require("../controllers/authController")
 const middleware = require("../middleware")
 
-
 router.post("/sign-up", authCtrl.SignUp)
 router.post("/sign-in", authCtrl.SignIn)
 
@@ -17,10 +16,10 @@ router.put(
 router.post("/set-password", authCtrl.setPassword)
 
 router.delete(
-  "/",
+  "/:userId",
   middleware.stripToken,
   middleware.verifyToken,
-  // middleware.isAttendee, // jeweler and deliveryman should be able to delete their accounts but through requests and not directly
+  middleware.isCustomer,
   authCtrl.deleteAccount
 )
 

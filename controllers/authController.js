@@ -5,8 +5,8 @@ const validatePassword = require("../validators/passwordValidator.js")
 const { createUser } = require("../services/userServices.js")
 const { deleteUserAccount } = require("../services/userServices.js")
 const { sendEmail } = require("../services/emailService")
+const { findByIdAndDelete } = require("../models/Shop.js")
 
-// if deliveryman has access, it should do the same for them
 // tested: I created an admin user, a jeweler user, and a customer user
 const SignUp = async (req, res) => {
   try {
@@ -26,11 +26,11 @@ const SignUp = async (req, res) => {
       role,
     })
 
-    await sendEmail({
-      to: email,
-      subject: "Welcome to Durra!",
-      text: `Greetings ${fName},\n\nWelcome to Durra! Your account has been successfully created and approved.\n\nYou can now log in and start using our services.\n\n- Durra Team`,
-    })
+    // await sendEmail({
+    //   to: email,
+    //   subject: "Welcome to Durra!",
+    //   text: `Greetings ${fName},\n\nWelcome to Durra! Your account has been successfully created and approved.\n\nYou can now log in and start using our services.\n\n- Durra Team`,
+    // })
 
     return res.status(201).json({
       message: "Signup successful!",
@@ -74,11 +74,26 @@ const SignIn = async (req, res) => {
   }
 }
 
-// not tested yet
+// tested: deleted customer account
 const deleteAccount = async (req, res) => {
   try {
-    const userId = res.locals.payload.id
-    await deleteUserAccount(userId)
+    const userId = req.params.userId
+    const user = await User.findById(userId)
+
+    if (!user) {
+      return res.status(404).send("User not found!")
+    }
+    if (res.locals.payload.id != userId) {
+      return res.status(403).json({ message: "Unauthorized action." })
+    }
+    if (user && user.role === "Customer") {
+      await User.findByIdAndDelete(userId)
+    }
+    await sendEmail({
+      to: user.email,
+      subject: "Account Deleted!",
+      text: `Greetings ${user.fName},\n\n Your account has been successfully deleted.\n\n- Durra Team`,
+    })
 
     res.status(200).send({ msg: "Account successfully deleted" })
   } catch (error) {
@@ -134,7 +149,7 @@ const UpdatePassword = async (req, res) => {
   }
 }
 
-//tested
+// tested
 const setPassword = async (req, res) => {
   try {
     const { token } = req.query

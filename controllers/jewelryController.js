@@ -1,6 +1,8 @@
 const Jewelry = require("../models/Jewelry")
 
 
+// total price of precious jewelry should be calculated again in front-end after they receive jewelry, I should - the precious total and recalculate it based on karatCost and then add it again
+// tested
 const getAllJewelry = async (req, res) => {
   try {
     const jewelry = await Jewelry.find().populate("shop")
@@ -15,7 +17,7 @@ const getAllJewelry = async (req, res) => {
   }
 }
 
-
+// tested!
 const getJewelry = async (req, res) => {
   try {
     const jewelry = await Jewelry.findById(req.params.jewelryId).populate("shop")

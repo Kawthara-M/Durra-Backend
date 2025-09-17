@@ -2,32 +2,32 @@ const Shop = require("../models/Shop")
 const User = require("../models/User")
 const Order = require("../models/Order")
 const Jewelry = require("../models/Jewelry")
+const Shipment = require("../models/Shipment")
+const Driver = require("../models/Driver")
 
+// tested while logged in as jeweler
 const getAllOrders = async (req, res) => {
   try {
-    const role = res.locals.payload.id
-    const userId = res.locals.payload.role
+    const userId = res.locals.payload.id
+    const role = res.locals.payload.role
     let orders = []
 
-    if (role === "customer") {
+    if (role === "Customer") {
       orders = await Order.find({ user: userId })
         .populate("user")
         .populate("jewelryOrder.jewelry")
-    } else if (role === "shop") {
-      const shopJewelryIds = await Jewelry.find({ shop: userId }).distinct(
-        "_id"
-      )
-      // distinct is used so we get only id not whole document
-
-      orders = await Order.find({
-        "jewelryOrder.jewelry": { $in: shopJewelryIds },
-      })
+        .populate("shop")
+    } else if (role === "Jeweler") {
+      orders = await Order.find({ shop: userId })
         .populate("user")
         .populate("jewelryOrder.jewelry")
-    } else if (role === "admin") {
+    } else if (role === "Admin") {
       orders = await Order.find()
         .populate("user")
         .populate("jewelryOrder.jewelry")
+        .populate("shop")
+    } else if (role === "Driver") {
+      orders = await Order.find().populate("user")
     } else {
       return res.status(403).json({ message: "Access denied" })
     }
@@ -41,6 +41,7 @@ const getAllOrders = async (req, res) => {
   }
 }
 
+// tested
 const getOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.orderId)
@@ -52,8 +53,9 @@ const getOrder = async (req, res) => {
     }
 
     if (
-      (userRole !== "Admin" || userRole !== "Shop") &&
-      order.user._id.toString() !== userId
+      userRole !== "Admin" &&
+      userRole !== "Jeweler" &&
+      order.user.toString() !== userId
     ) {
       return res.status(403).json({ error: "Unauthorized to view this Order." })
     }
@@ -67,33 +69,263 @@ const getOrder = async (req, res) => {
   }
 }
 
+// teested, and somehow works
 const createOrder = async (req, res) => {
   try {
-    // create a new order
+    const userId = res.locals.payload.id
+    const { jewelryOrder, totalPrice, collectionMethod } = req.body
+
+    if (
+      !jewelryOrder ||
+      !Array.isArray(jewelryOrder) ||
+      jewelryOrder.length === 0
+    ) {
+      return res.status(400).json({ message: "Jewelry order cannot be empty." })
+    }
+
+    const jewelryId = jewelryOrder[0].jewelry
+    const jewelryItem = await Jewelry.findById(jewelryId)
+
+    if (!jewelryItem) {
+      return res.status(400).json({ message: "Jewelry item not found." })
+    }
+
+    const shopId = jewelryItem.shop
+
+    if (jewelryOrder[0].totalPrice !== totalPrice) {
+      return res.status(400).json({ message: "Total price mismatch." })
+    }
+
+    const newOrder = new Order({
+      user: userId,
+      shop: shopId,
+      jewelryOrder,
+      totalPrice,
+      collectionMethod,
+      status: "pending",
+    })
+
+    await newOrder.save()
+
+    res.status(201).json({
+      message: "Order created successfully.",
+      order: newOrder,
+    })
   } catch (error) {
     console.error("Error creating order:", error)
     res.status(500).json({ message: "Failed to create order" })
   }
 }
 
+// tested by increasing quantity of same jewelry, adding other jewelry
 const updateOrder = async (req, res) => {
   try {
-    // update an order
+    const userId = res.locals.payload.id
+    const { orderId } = req.params
+    const { jewelryOrder: updatedItemsFromClient } = req.body
+
+    if (
+      !updatedItemsFromClient ||
+      !Array.isArray(updatedItemsFromClient) ||
+      updatedItemsFromClient.length === 0
+    ) {
+      return res.status(400).json({ message: "No jewelry items provided." })
+    }
+
+    const order = await Order.findById(orderId)
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found." })
+    }
+
+    if (order.user.toString() !== userId) {
+      return res
+        .status(403)
+        .json({ message: "Unauthorized to update this order." })
+    }
+
+    if (order.status !== "pending") {
+      return res
+        .status(400)
+        .json({ message: "Only pending orders can be updated." })
+    }
+
+    let updatedItems = [...order.jewelryOrder]
+
+    for (const updatedItem of updatedItemsFromClient) {
+      const { jewelry, quantity, totalPrice, notes } = updatedItem
+
+      if (!jewelry || quantity === undefined || totalPrice === undefined) {
+        return res.status(400).json({
+          message:
+            "Each jewelry item must include jewelry ID, quantity, and totalPrice.",
+        })
+      }
+
+      const jewelryDoc = await Jewelry.findById(jewelry)
+      if (!jewelryDoc) {
+        return res
+          .status(400)
+          .json({ message: `Jewelry item not found: ${jewelry}` })
+      }
+
+      if (jewelryDoc.shop.toString() !== order.shop.toString()) {
+        return res.status(400).json({
+          message:
+            "Jewelry item does not belong to the same shop as the order.",
+        })
+      }
+
+      const existingIndex = updatedItems.findIndex(
+        (item) => item.jewelry.toString() === jewelry
+      )
+
+      if (existingIndex !== -1) {
+        if (quantity === 0) {
+          updatedItems.splice(existingIndex, 1)
+        } else {
+          updatedItems[existingIndex].quantity = quantity
+          updatedItems[existingIndex].totalPrice = totalPrice
+          if (notes !== undefined) {
+            updatedItems[existingIndex].notes = notes
+          }
+        }
+      } else {
+        if (quantity > 0) {
+          updatedItems.push({
+            jewelry,
+            quantity,
+            totalPrice,
+            status: "not-ready",
+            notes: notes || "",
+          })
+        }
+      }
+    }
+
+    const newTotalPrice = updatedItems.reduce(
+      (sum, item) => sum + item.totalPrice,
+      0
+    )
+
+    order.jewelryOrder = updatedItems
+    order.totalPrice = newTotalPrice
+
+    await order.save()
+
+    res.status(200).json({
+      message: "Order updated successfully.",
+      order,
+    })
   } catch (error) {
     console.error("Error updating order:", error)
     res.status(500).json({ message: "Failed to update order" })
   }
 }
 
+// tested until processing
 const updateOrderStatus = async (req, res) => {
   try {
-    // update order status (for jeweler or deliveryman)
+    const { orderId } = req.params
+
+    // we name it newStatus because we refer to status in code, so this is to distinguish between current and new status
+    const { status: newStatus } = req.body
+    const userId = res.locals.payload.id
+    const role = res.locals.payload.role
+
+    if (!newStatus) {
+      return res.status(400).json({ message: "New status is required." })
+    }
+
+    const order = await Order.findById(orderId)
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found." })
+    }
+
+    const currentStatus = order.status
+
+    const statusTransitions = {
+      Customer: {
+        pending: ["submitted"],
+      },
+      Jeweler: {
+        submitted: ["accepted", "rejected"],
+        accepted: ["processing"],
+        processing: ["pickup"],
+      },
+      Driver: {
+        pickup: ["delivered"],
+      },
+    }
+
+    // to get the allowed status transitions based on the user role and current status of the order
+    const allowedTransitions = statusTransitions[role]?.[currentStatus] || []
+
+    if (!allowedTransitions.includes(newStatus)) {
+      return res.status(403).json({
+        message: `${role} cannot change order from '${currentStatus}' to '${newStatus}'`,
+      })
+    }
+
+    if (role === "Customer") {
+      if (order.user.toString() !== userId) {
+        return res
+          .status(403)
+          .json({ message: "Unauthorized to update this order." })
+      }
+    } else if (role === "Jeweler") {
+      const shop = await Shop.findOne({ user: res.locals.payload.id })
+      if (order.shop.toString() !== shop._id.toString()) {
+        return res
+          .status(403)
+          .json({ message: "Unauthorized: Not your order." })
+      }
+    } else if (role === "Driver") {
+      if (order.driver?.toString() !== userId) {
+        return res
+          .status(403)
+          .json({ message: "Unauthorized: Not assigned to this order." })
+      }
+    }
+    order.status = newStatus
+
+    await order.save()
+
+    // not tested
+    if (newStatus === "pickup" && order.collectionMethod === "delivery") {
+      const drivers = await User.find({ role: "driver" })
+      if (drivers.length === 0) {
+        throw new Error("No delivery men available")
+      }
+
+      const randomIndex = Math.floor(Math.random() * drivers.length)
+      const assignedDriver = drivers[randomIndex]
+      const driver = await Driver.findOne({
+        user: assignedDriver._id,
+      }).populate("user")
+
+      const shipment = new Shipment({
+        order: orderId,
+        driver: driver._id,
+        pickedUpAt: null,
+        deliveredAt: null,
+        currentLocation: null,
+        status: "atShop",
+      })
+    }
+
+    res.status(200).json({
+      message: `Order status updated to '${newStatus}'.`,
+      order,
+    })
   } catch (error) {
     console.error("Error updating order status:", error)
     res.status(500).json({ message: "Failed to update order status" })
   }
 }
 
+// tested
 const cancelOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.orderId)
@@ -102,19 +334,19 @@ const cancelOrder = async (req, res) => {
     if (!order) {
       return res.status(404).json({ error: "Order not found." })
     }
-    if (order.status !== "pending") {
-      return res
-        .status(400)
-        .json({ error: "Cannot delete an order that has been received." })
+    if (order.status !== "pending" && order.status !== "submitted") {
+      return res.status(400).json({
+        error: "Cannot cancel an order that has been accepted/rejected.",
+      })
     }
     if (order.user.toString() !== userId) {
       return res
         .status(403)
-        .json({ error: "Unauthorized to delete this order." })
+        .json({ error: "Unauthorized to cancel this order." })
     }
-    await Request.findByIdAndDelete(req.params.requestId)
+    await Order.findByIdAndDelete(req.params.orderId)
 
-    res.status(200).send({ msg: "Request successfully deleted" })
+    res.status(200).send({ msg: "Order successfully Cancelled" })
   } catch (error) {
     console.error("Error canceling order:", error)
     res.status(500).json({ message: "Failed to cancel order" })

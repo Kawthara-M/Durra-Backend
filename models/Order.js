@@ -8,6 +8,7 @@ const OrderSchema = new Schema(
       ref: "User",
       required: true,
     },
+    shop: { type: Schema.Types.ObjectId, ref: "Shop", required: true },
     // serviceOrderId: {
     //   type: Schema.Types.ObjectId,
     //   ref: "",
@@ -48,18 +49,34 @@ const OrderSchema = new Schema(
       required: true,
     },
     collectionMethod: {
-      type: Number,
+      type: String,
       enum: ["delivery", "at-shop-collection"],
       default: "delivery",
     },
     status: {
       type: String,
-      enum: ["pending","received", "processing", "shipped", "delivered", "cancelled"],
-      default: "received",
+      enum: [
+        "pending", // while in cart
+        "submitted", // customer clicked submit order
+        "accepted", // shop accepted order
+        "rejected", // shop rejected order
+        "processing", // shop is working on order
+        "pickup", // ready for pickup by driver or customer
+        "delivered", // received by customer
+        "cancelled", // customer cancelled before shop decides
+      ], // ensure they are correct
+      default: "pending",
     },
-    /* deliveryMan: {
-      
-    } */
+    driver: {
+      type: Schema.Types.ObjectId,
+      ref: "Driver",
+      // required: true,
+    },
+    address: {
+      type: Schema.Types.ObjectId,
+      ref: "Address",
+      // required: true,
+    },
   },
   {
     timestamps: true,

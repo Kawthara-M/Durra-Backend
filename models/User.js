@@ -1,6 +1,7 @@
 const mongoose = require("mongoose")
+const Schema = mongoose.Schema
 
-const userSchema = mongoose.Schema(
+const UserSchema = mongoose.Schema(
   {
     fName: {
       type: String,
@@ -18,10 +19,17 @@ const userSchema = mongoose.Schema(
       type: String,
       required: true,
     },
-    address: {
-      type: String,
-      default: "",
+    addresses: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Address",
+      },
+    ],
+    defaultAddress: {
+      type: Schema.Types.ObjectId,
+      ref: "Address",
     },
+
     passwordDigest: {
       type: String,
       default: "",
@@ -29,7 +37,7 @@ const userSchema = mongoose.Schema(
     role: {
       type: String,
       required: true,
-      enum: ["Admin", "Customer", "Jeweler", "DeliveryMan"],
+      enum: ["Admin", "Customer", "Jeweler", "Driver"],
     },
     passwordResetToken: {
       type: String,
@@ -43,4 +51,4 @@ const userSchema = mongoose.Schema(
   { timestamps: true }
 )
 
-module.exports = mongoose.model("User", userSchema)
+module.exports = mongoose.model("User", UserSchema)

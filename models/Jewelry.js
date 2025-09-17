@@ -117,6 +117,23 @@ const JewelrySchema = new Schema(
         },
       },
     ],
+    certifications: [
+      {
+        name: {
+          type: String,
+          required: true,
+        },
+        reportNumber: {
+          type: String,
+        },
+        reportDate: {
+          type: String,
+        },
+        isVerified: {
+          type: Boolean
+        }
+      },
+    ],
   },
   {
     timestamps: true,
