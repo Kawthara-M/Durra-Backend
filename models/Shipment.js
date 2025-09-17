@@ -31,4 +31,4 @@ const ShipmentSchema = new Schema(
   }
 )
 
-module.exports = mongoose.model("Order", OrderSchema)
+module.exports = mongoose.model("Shipment", ShipmentSchema)
