@@ -2,10 +2,11 @@ const Shop = require("../models/Shop")
 const User = require("../models/User")
 const Order = require("../models/Order")
 const Jewelry = require("../models/Jewelry")
+const Service = require("../models/Service")
 const Shipment = require("../models/Shipment")
 const Driver = require("../models/Driver")
 
-// tested while logged in as jeweler
+// tested while logged in as jeweler, test again I added service
 const getAllOrders = async (req, res) => {
   try {
     const userId = res.locals.payload.id
@@ -15,16 +16,19 @@ const getAllOrders = async (req, res) => {
     if (role === "Customer") {
       orders = await Order.find({ user: userId })
         .populate("user")
-        .populate("jewelryOrder.jewelry")
+        .populate("jewelryOrder")
+        .populate("serviceOrder")
         .populate("shop")
     } else if (role === "Jeweler") {
       orders = await Order.find({ shop: userId })
         .populate("user")
-        .populate("jewelryOrder.jewelry")
+        .populate("jewelryOrder")
+        .populate("serviceOrder")
     } else if (role === "Admin") {
       orders = await Order.find()
         .populate("user")
-        .populate("jewelryOrder.jewelry")
+        .populate("jewelryOrder")
+        .populate("serviceOrder")
         .populate("shop")
     } else if (role === "Driver") {
       orders = await Order.find().populate("user")
@@ -33,15 +37,13 @@ const getAllOrders = async (req, res) => {
     }
 
     res.status(200).json({ orders })
-
-    // In populate we can limit the info of jewelry, but currently I am passing all until we ensure everything is right and what exactly we need
   } catch (error) {
     console.error("Error fetching all orders:", error)
     res.status(500).json({ message: "Failed to fetch orders" })
   }
 }
 
-// tested
+// tested, test again I added service
 const getOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.orderId)
@@ -69,40 +71,73 @@ const getOrder = async (req, res) => {
   }
 }
 
-// teested, and somehow works
+// teested, and somehow works, test again after service thing
 const createOrder = async (req, res) => {
   try {
     const userId = res.locals.payload.id
-    const { jewelryOrder, totalPrice, collectionMethod } = req.body
+    const {
+      jewelryOrder = [],
+      serviceOrder = [],
+      totalPrice,
+      collectionMethod,
+      address,
+    } = req.body
 
-    if (
-      !jewelryOrder ||
-      !Array.isArray(jewelryOrder) ||
-      jewelryOrder.length === 0
-    ) {
-      return res.status(400).json({ message: "Jewelry order cannot be empty." })
+    if (jewelryOrder.length === 0 && serviceOrder.length === 0) {
+      return res.status(400).json({ message: "Order cannot be empty." })
     }
 
-    const jewelryId = jewelryOrder[0].jewelry
-    const jewelryItem = await Jewelry.findById(jewelryId)
-
-    if (!jewelryItem) {
-      return res.status(400).json({ message: "Jewelry item not found." })
+    if (!address) {
+      const user = await User.findById(userId).select("defaultAddress")
+      if (!user.defaultAddress) {
+        address = ""
+      }
+      address = user.defaultAddress
     }
 
-    const shopId = jewelryItem.shop
+    let shopId
 
-    if (jewelryOrder[0].totalPrice !== totalPrice) {
-      return res.status(400).json({ message: "Total price mismatch." })
+    if (jewelryOrder.length > 0) {
+      const jewelryId = jewelryOrder[0].jewelry
+      const jewelryItem = await Jewelry.findById(jewelryId)
+
+      if (!jewelryItem) {
+        return res.status(400).json({ message: "Jewelry item not found." })
+      }
+
+      shopId = jewelryItem.shop
+
+      if (jewelryOrder[0].totalPrice !== totalPrice) {
+        return res
+          .status(400)
+          .json({ message: "Total price mismatch for jewelry order." })
+      }
+    } else if (serviceOrder.length > 0) {
+      const serviceId = serviceOrder[0].service
+      const serviceItem = await Service.findById(serviceId)
+
+      if (!serviceItem) {
+        return res.status(400).json({ message: "Service item not found." })
+      }
+
+      shopId = serviceItem.shop
+
+      if (serviceOrder[0].totalPrice !== totalPrice) {
+        return res
+          .status(400)
+          .json({ message: "Total price mismatch for service order." })
+      }
     }
 
     const newOrder = new Order({
       user: userId,
       shop: shopId,
       jewelryOrder,
+      serviceOrder,
       totalPrice,
       collectionMethod,
       status: "pending",
+      address,
     })
 
     await newOrder.save()
@@ -117,19 +152,21 @@ const createOrder = async (req, res) => {
   }
 }
 
-// tested by increasing quantity of same jewelry, adding other jewelry
+// tested by increasing quantity of same jewelry, adding other jewelry, test again after adding services
 const updateOrder = async (req, res) => {
   try {
     const userId = res.locals.payload.id
     const { orderId } = req.params
-    const { jewelryOrder: updatedItemsFromClient } = req.body
+    const {
+      jewelryOrder: updatedItemsFromClient,
+      serviceOrder: updatedServicesFromClient,
+    } = req.body
 
     if (
-      !updatedItemsFromClient ||
-      !Array.isArray(updatedItemsFromClient) ||
-      updatedItemsFromClient.length === 0
+      (!updatedItemsFromClient || !Array.isArray(updatedItemsFromClient)) &&
+      (!updatedServicesFromClient || !Array.isArray(updatedServicesFromClient))
     ) {
-      return res.status(400).json({ message: "No jewelry items provided." })
+      return res.status(400).json({ message: "No valid order data provided." })
     }
 
     const order = await Order.findById(orderId)
@@ -176,6 +213,7 @@ const updateOrder = async (req, res) => {
         })
       }
 
+      // this jewelry already exist in order?
       const existingIndex = updatedItems.findIndex(
         (item) => item.jewelry.toString() === jewelry
       )
@@ -203,13 +241,88 @@ const updateOrder = async (req, res) => {
       }
     }
 
-    const newTotalPrice = updatedItems.reduce(
+    let updatedServices = []
+
+    if (Array.isArray(updatedServicesFromClient)) {
+      for (const serviceItem of updatedServicesFromClient) {
+        const { _id, service, jewelry, images, totalPrice, notes } = serviceItem
+
+        if (
+          !service ||
+          !Array.isArray(jewelry) ||
+          jewelry.length === 0 ||
+          totalPrice === undefined
+        ) {
+          return res.status(400).json({
+            message:
+              "Each service must include service ID, at least one jewelry item, and totalPrice.",
+          })
+        }
+
+        const parsedJewelry = []
+
+        for (const j of jewelry) {
+          if (j.platformJewelry) {
+            const pj = await Jewelry.findById(j.platformJewelry)
+            if (!pj) {
+              return res.status(400).json({
+                message: `Platform jewelry not found: ${j.platformJewelry}`,
+              })
+            }
+
+            parsedJewelry.push({ platformJewelry: j.platformJewelry })
+          } else if (j.ownedJewelry) {
+            if (!images || !Array.isArray(images) || images.length === 0) {
+              return res.status(400).json({
+                message: "Images are required for owned jewelry.",
+              })
+            }
+            parsedJewelry.push({ ownedJewelry: j.ownedJewelry })
+          } else {
+            return res.status(400).json({
+              message:
+                "Each jewelry item must be either platformJewelry or ownedJewelry.",
+            })
+          }
+        }
+
+
+        let status = "not-ready"
+        if (_id) {
+          const existingService = order.serviceOrder.find(
+            (s) => s._id.toString() === _id
+          )
+          if (existingService) {
+            status = existingService.status || "not-ready"
+          }
+        }
+
+        updatedServices.push({
+          _id,
+          service,
+          jewelry: parsedJewelry,
+          images: images || [],
+          totalPrice,
+          status,
+          notes: notes || "",
+        })
+      }
+    }
+
+    order.serviceOrder = updatedServices
+
+    const totalJewelryPrice = updatedItems.reduce(
+      (sum, item) => sum + item.totalPrice,
+      0
+    )
+    const totalServicePrice = updatedServices.reduce(
       (sum, item) => sum + item.totalPrice,
       0
     )
 
     order.jewelryOrder = updatedItems
-    order.totalPrice = newTotalPrice
+    order.serviceOrder = updatedServices
+    order.totalPrice = totalJewelryPrice + totalServicePrice
 
     await order.save()
 

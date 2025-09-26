@@ -6,7 +6,6 @@ const Collection = require("../models/Collection")
 const Order = require("../models/Order")
 const Address = require("../models/Address")
 const Request = require("../models/Request")
-const { createUser } = require("../services/userServices.js")
 const { sendEmail } = require("../services/emailService")
 
 // tested
@@ -44,49 +43,48 @@ const getShop = async (req, res) => {
   }
 }
 
-// tested
-const createShop = async (req, res) => {
+//should test
+const updateShop = async (req, res) => {
   try {
-    const { email, phone, role, address, name, cr, description } = req.body
+    const { shopId } = req.params
+    const { name, cr, description, address } = req.body
+    const { id: userId, role } = res.locals.payload
 
-    const user = await createUser({
-      email,
-      phone,
-      role,
-    })
+    if (!shopId) {
+      return res
+        .status(400)
+        .json({ error: "No Shop ID provided for deletion." })
+    }
 
-    const resetToken = crypto.randomBytes(32).toString("hex")
-    const hashedToken = crypto
-      .createHash("sha256")
-      .update(resetToken)
-      .digest("hex")
+    const shop = await Shop.findById(shopId)
+    if (!shop) {
+      return res.status(404).json({ error: "Shop not found." })
+    }
 
-    // Store token and expiry
-    user.passwordResetToken = hashedToken
-    user.passwordResetExpires = Date.now() + 24 * 60 * 60 * 1000
-    await user.save()
+    const isAdmin = role === "Admin"
+    const isOwnerJeweler = role === "Jeweler" && shop.user.toString() === userId
 
-    await Shop.create({
-      user: user._id,
-      name: name || "",
-      cr: cr || "",
-      description: description || "",
-    })
+    if (!isAdmin && !isOwnerJeweler) {
+      return res
+        .status(403)
+        .json({
+          error:
+            "Unauthorized: You do not have permission to update this shop.",
+        })
+    }
 
-    const resetLink = `http://localhost:3010/auth/set-password?token=${resetToken}`
-    // uncomment later so we dont spam
-    await sendEmail({
-      to: email,
-      subject: "Durra Account Activation",
-      text: `Greetings ${name},\n\nThanks for signing up as a jeweler. You have been assigned access to Durra platform, use this link ${resetLink} to set your password. Please make sure to update your password.\n\n- Durra Team`,
-    })
+    const updatedShop = await Shop.findByIdAndUpdate(
+      shopId,
+      { name, cr, description, address },
+      { new: true }
+    )
 
-    return res.status(201).json({
-      message: "Shop Successfully Created!",
-      userId: user._id,
-    })
+    return res
+      .status(200)
+      .json({ message: "Shop data edited successfully.", updatedShop })
   } catch (error) {
-    return res.status(400).json({ error: error.message })
+    console.error("Error editing shop:", error)
+    return res.status(500).json({ error: error.message })
   }
 }
 
@@ -146,6 +144,6 @@ Durra Team`,
 module.exports = {
   getAllShops,
   getShop,
-  createShop,
+  updateShop,
   deleteShop,
 }

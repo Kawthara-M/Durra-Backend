@@ -3,6 +3,7 @@ const express = require("express")
 require("dotenv").config()
 const path = require("path")
 const fs = require("fs")
+const cors = require("cors")
 
 // Initialize app
 const app = express()
@@ -22,6 +23,7 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // use MiddleWares
+app.use(cors())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 app.use(morgan("dev"))
@@ -40,9 +42,11 @@ const userRouter = require("./routes/userRouter")
 const requestRouter = require("./routes/requestRouter")
 const shopRouter = require("./routes/shopRouter")
 const jewelryRouter = require("./routes/jewelryRouter")
+const serviceRouter = require("./routes/serviceRouter")
 const collectionRouter = require("./routes/collectionRouter")
 const orderRouter = require("./routes/orderRouter")
 const addressRouter = require("./routes/addressRouter")
+// const reviewRouter = require("./routes/reviewRouter")
 // const deliveryRouter = require("./routes/deliveryRouter")
 
 // use Routers
@@ -51,9 +55,11 @@ app.use("/profile", userRouter)
 app.use("/requests", requestRouter)
 app.use("/shops", shopRouter)
 app.use("/jewelry", jewelryRouter)
+app.use("/services", serviceRouter)
 app.use("/collections", collectionRouter)
 app.use("/orders", orderRouter)
 app.use("/addresses", addressRouter)
+// app.use("/reviews", reviewRouter)
 // app.use("drivers", deliveryRouter)
 
 // Listener

@@ -28,6 +28,14 @@ const JewelrySchema = new Schema(
       type: Number,
       required: true,
     },
+    productionCost: {
+      type: Number,
+      required: true,
+    },
+    originPrice: {
+      type: Number,
+      required: true,
+    },
     totalPrice: {
       type: Number,
     },
@@ -55,10 +63,6 @@ const JewelrySchema = new Schema(
           type: Number,
           required: true,
         },
-        productionCost: {
-          type: Number,
-          required: true,
-        },
         karatCost: {
           type: Number,
           required: true,
@@ -75,11 +79,27 @@ const JewelrySchema = new Schema(
           type: Number,
           required: true,
         },
+        shape: {
+          type: String,
+          required: true,
+        },
+        color: {
+          type: String,
+          required: true,
+        },
+        number: {
+          type: Number,
+          required: true,
+        },
       },
     ],
     diamonds: [
       {
         weight: {
+          type: Number,
+          required: true,
+        },
+        number: {
           type: Number,
           required: true,
         },
@@ -130,8 +150,8 @@ const JewelrySchema = new Schema(
           type: String,
         },
         isVerified: {
-          type: Boolean
-        }
+          type: Boolean,
+        },
       },
     ],
   },

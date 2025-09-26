@@ -5,14 +5,14 @@ const middleware = require("../middleware")
 router.get("/", shopCtrl.getAllShops)
 
 router.get("/:shopId", shopCtrl.getShop)
-router.post(
-  "/",
+
+// can be accessed by admin or shop
+router.put(
+  "/:shopId",
   middleware.stripToken,
   middleware.verifyToken,
-  middleware.isAdmin,
-  shopCtrl.createShop
+  shopCtrl.updateShop
 )
-
 router.delete(
   "/:shopId",
   middleware.stripToken,

@@ -7,6 +7,7 @@ router.get(
   "/",
   middleware.stripToken,
   middleware.verifyToken,
+  middleware.isAdmin,
   requestCtrl.getAllRequests
 )
 router.get(
@@ -21,6 +22,7 @@ router.get(
   "/:requestId",
   middleware.stripToken,
   middleware.verifyToken,
+  middleware.isAdmin,
   requestCtrl.getRequest
 )
 
@@ -28,7 +30,6 @@ router.post(
   "/",
   middleware.stripToken,
   middleware.verifyToken,
-  upload.array("image", 5),
   requestCtrl.createRequest
 )
 
@@ -37,14 +38,6 @@ router.put(
   middleware.stripToken,
   middleware.verifyToken,
   requestCtrl.updateRequest
-)
-
-router.delete(
-  "/:requestId",
-  middleware.stripToken,
-  middleware.verifyToken,
-  middleware.isJeweler,
-  requestCtrl.deleteRequest
 )
 
 module.exports = router

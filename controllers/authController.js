@@ -3,9 +3,7 @@ const User = require("../models/User")
 const middleware = require("../middleware/index.js")
 const validatePassword = require("../validators/passwordValidator.js")
 const { createUser } = require("../services/userServices.js")
-const { deleteUserAccount } = require("../services/userServices.js")
 const { sendEmail } = require("../services/emailService")
-const { findByIdAndDelete } = require("../models/Shop.js")
 
 // tested: I created an admin user, a jeweler user, and a customer user
 const SignUp = async (req, res) => {

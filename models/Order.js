@@ -9,16 +9,40 @@ const OrderSchema = new Schema(
       required: true,
     },
     shop: { type: Schema.Types.ObjectId, ref: "Shop", required: true },
-    // serviceOrderId: {
-    //   type: Schema.Types.ObjectId,
-    //   ref: "",
-    //   required: true,
-    // },
-    // resellingOrderId: {
-    //   type: Schema.Types.ObjectId,
-    //   ref: "",
-    //   required: true,
-    // },
+    serviceOrder: [
+      {
+        service: {
+          type: Schema.Types.ObjectId,
+          ref: "Service",
+          required: true,
+        },
+        jewelry: [
+          {
+            platformJewelry: {
+              type: Schema.Types.ObjectId,
+              ref: "Jewelry",
+            },
+            ownedJewelry: {
+              type: Schema.Types.Mixed,
+            },
+          },
+        ],
+        images: { type: [String], default: [] },
+        totalPrice: {
+          type: Number,
+          required: true,
+        },
+        status: {
+          type: String,
+          enum: ["ready", "not-ready"],
+          default: "not-ready",
+        },
+        notes: {
+          type: String,
+        },
+      },
+    ],
+
     jewelryOrder: [
       {
         jewelry: {
@@ -66,11 +90,6 @@ const OrderSchema = new Schema(
         "cancelled", // customer cancelled before shop decides
       ], // ensure they are correct
       default: "pending",
-    },
-    driver: {
-      type: Schema.Types.ObjectId,
-      ref: "Driver",
-      // required: true,
     },
     address: {
       type: Schema.Types.ObjectId,

@@ -4,8 +4,8 @@ const middleware = require("../middleware/index.js")
 const validatePassword = require("../validators/passwordValidator.js")
 
 // createUser is a service because its' reached by auth controller and shop controller
-// I should prevent admin direct signup, what if they use insomnia to signup, let's ask Ghadeer first
-async function createUser({ fName, lName, email, phone, password, role }) {
+// I should prevent admin direct signup, what if they use insomnia to signup, 
+async function createUser({ fName, lName, email, phone, password, address, role }) {
   if ((role === "Admin" || role === "Customer") && !password) {
     throw new Error("Password is required.")
   }
@@ -34,6 +34,7 @@ async function createUser({ fName, lName, email, phone, password, role }) {
     email,
     phone,
     role,
+    address,
     passwordDigest,
   })
   return user
