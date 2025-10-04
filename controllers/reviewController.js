@@ -21,6 +21,7 @@ const getReviews = async (req, res) => {
     }
 
     if (!item) {
+      console.log("here")
       return res.status(404).json({ error: `${reviewedItemType} not found.` })
     }
 
@@ -62,6 +63,29 @@ const createReview = async (req, res) => {
     }
 
     // check if user is has ordered this jewelry/service
+    const validStatuses = ["delivered", "pickup"]
+
+    let hasOrdered = false
+
+    if (reviewedItemType === "Service") {
+      hasOrdered = await Order.exists({
+        user: userId,
+        status: { $in: validStatuses },
+        "serviceOrder.service": reviewedItem,
+      })
+    } else if (reviewedItemType === "Jewelry") {
+      hasOrdered = await Order.exists({
+        user: userId,
+        status: { $in: validStatuses },
+        "jewelryOrder.jewelry": reviewedItem,
+      })
+    }
+
+    if (!hasOrdered) {
+      return res.status(403).json({
+        error: `You must order this ${reviewedItemType.toLowerCase()} before reviewing.`,
+      })
+    }
 
     const newReview = await Review.create({
       user: userId,

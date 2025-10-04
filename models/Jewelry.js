@@ -36,9 +36,6 @@ const JewelrySchema = new Schema(
       type: Number,
       required: true,
     },
-    totalPrice: {
-      type: Number,
-    },
     limitPerOrder: {
       type: Number,
       required: true,
@@ -60,10 +57,6 @@ const JewelrySchema = new Schema(
           required: true,
         },
         weight: {
-          type: Number,
-          required: true,
-        },
-        karatCost: {
           type: Number,
           required: true,
         },
@@ -105,7 +98,6 @@ const JewelrySchema = new Schema(
         },
         color: {
           type: String,
-          required: true,
         },
         clarity: {
           type: String,
@@ -113,7 +105,6 @@ const JewelrySchema = new Schema(
         },
         cutGrade: {
           type: String,
-          required: true,
         },
         type: {
           type: String,
@@ -121,7 +112,6 @@ const JewelrySchema = new Schema(
         },
         shape: {
           type: String,
-          required: true,
         },
       },
     ],
@@ -154,6 +144,10 @@ const JewelrySchema = new Schema(
         },
       },
     ],
+    deleted: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

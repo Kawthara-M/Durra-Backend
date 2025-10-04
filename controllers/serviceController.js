@@ -4,7 +4,7 @@ const Shop = require("../models/Shop")
 // not tested
 const getAllServices = async (req, res) => {
   try {
-    const services = await Service.find().populate("shop")
+    const services = await Service.find({ deleted: false }).populate("shop")
     return res.status(200).json({ services })
   } catch (error) {
     console.error("Error fetching services:", error)
@@ -15,20 +15,22 @@ const getAllServices = async (req, res) => {
 // tested from frontend
 const getAllServicesByShop = async (req, res) => {
   try {
-    const { role, userId } = res.locals.payload
+    const { role, id } = res.locals.payload
 
     let services
 
     if (role === "Jeweler") {
-      const shop = await Shop.findOne({ jeweler: userId })
+      const shop = await Shop.findOne({ user: id })
 
       if (!shop) {
         return res
           .status(404)
           .json({ error: "Shop not found for this Jeweler." })
       }
-
-      services = await Service.find({ shop: shop._id }).populate("shop")
+      services = await Service.find({
+        shop: shop._id,
+        deleted: false,
+      }).populate("shop")
     } else {
       services = await Service.find().populate("shop")
     }
@@ -78,7 +80,7 @@ const createService = async (req, res) => {
         .json({ error: "Unauthorized to create service for this shop." })
     }
 
-    const BASE_URL = process.env.BASE_URL 
+    const BASE_URL = process.env.BASE_URL
 
     const images =
       req.files?.map((file) => `${BASE_URL}/uploads/${file.filename}`) || []
@@ -108,32 +110,37 @@ const updateService = async (req, res) => {
     const { id: userId } = res.locals.payload
 
     const service = await Service.findById(serviceId)
-    if (!service) {
-      return res.status(404).json({ error: "Service not found." })
-    }
+    if (!service) return res.status(404).json({ error: "Service not found." })
 
     const shop = await Shop.findById(service.shop)
-    if (!shop) {
-      return res.status(404).json({ error: "Shop not found." })
-    }
+    if (!shop) return res.status(404).json({ error: "Shop not found." })
 
-    const isOwner = shop.user.toString() === userId
-    if (!isOwner) {
+    if (shop.user.toString() !== userId) {
       return res
         .status(403)
         .json({ error: "Unauthorized to update this service." })
     }
 
-    const { name, description, price } = req.body
+    const { name, description, price, limitPerOrder } = req.body
 
-    if (req.files && req.files.length > 0) {
-      service.images = req.files.map((file) => `/uploads/${file.filename}`)
+    let existingImages = []
+    if (req.body.existingImages) {
+      try {
+        existingImages = JSON.parse(req.body.existingImages)
+      } catch {
+        return res.status(400).json({ error: "Invalid existingImages format." })
+      }
     }
+
+    const BASE_URL = process.env.BASE_URL
+    const newImages =
+      req.files?.map((file) => `${BASE_URL}/uploads/${file.filename}`) || []
 
     service.name = name ?? service.name
     service.description = description ?? service.description
     service.price = price ?? service.price
-
+    service.limitPerOrder = limitPerOrder ?? service.limitPerOrder
+    service.images = [...existingImages, ...newImages]
     await service.save()
 
     return res.status(200).json({
@@ -146,7 +153,7 @@ const updateService = async (req, res) => {
   }
 }
 
-// not tested
+// tested from frontend
 const deleteService = async (req, res) => {
   try {
     const { serviceId } = req.params
@@ -171,7 +178,7 @@ const deleteService = async (req, res) => {
         .json({ error: "Unauthorized to delete this service." })
     }
 
-    await Jewelry.findByIdAndUpdate(serviceId, { deleted: true })
+    await Service.findByIdAndUpdate(serviceId, { deleted: true })
 
     return res.status(200).json({ message: "Service deleted successfully." })
   } catch (error) {

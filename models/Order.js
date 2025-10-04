@@ -16,26 +16,14 @@ const OrderSchema = new Schema(
           ref: "Service",
           required: true,
         },
-        jewelry: [
-          {
-            platformJewelry: {
-              type: Schema.Types.ObjectId,
-              ref: "Jewelry",
-            },
-            ownedJewelry: {
-              type: Schema.Types.Mixed,
-            },
-          },
-        ],
-        images: { type: [String], default: [] },
+        jewelry: {
+          name: { type: String },
+          images: [{ type: [String], default: [] }],
+        },
+
         totalPrice: {
           type: Number,
           required: true,
-        },
-        status: {
-          type: String,
-          enum: ["ready", "not-ready"],
-          default: "not-ready",
         },
         notes: {
           type: String,
@@ -58,11 +46,6 @@ const OrderSchema = new Schema(
           type: Number,
           required: true,
         },
-        status: {
-          type: String,
-          enum: ["ready", "not-ready"],
-          default: "not-ready",
-        },
         notes: {
           type: String,
         },
@@ -76,6 +59,11 @@ const OrderSchema = new Schema(
       type: String,
       enum: ["delivery", "at-shop-collection"],
       default: "delivery",
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["Cash", "Card"],
+      default: "Cash",
     },
     status: {
       type: String,
@@ -91,10 +79,18 @@ const OrderSchema = new Schema(
       ], // ensure they are correct
       default: "pending",
     },
+    paymentStatus: {
+      type: String,
+      enum: ["Paid", "not-paid"],
+      default: "not-paid",
+    },
     address: {
       type: Schema.Types.ObjectId,
       ref: "Address",
       // required: true,
+    },
+    notes: {
+      type: String,
     },
   },
   {

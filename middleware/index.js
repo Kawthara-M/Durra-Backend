@@ -22,15 +22,19 @@ const createToken = (payload) => {
 
 const stripToken = (req, res, next) => {
   try {
-    const token = req.headers["authorization"].split(" ")[1]
+    const authHeader = req.headers["authorization"]
+    if (!authHeader) throw new Error("No auth header")
+
+    const token = authHeader.split(" ")[1]
     if (token) {
       res.locals.token = token
       return next()
     }
-    res.status(401).send({ status: "Error", msg: "Unauthorized" })
+
+    throw new Error("No token in header")
   } catch (error) {
-    console.log(error)
-    res.status(401).send({ status: "Error", msg: "Strip Token Error!" })
+    console.error("stripToken error:", error.message)
+    res.status(401).send({ status: "Error", msg: "Unauthorized" })
   }
 }
 

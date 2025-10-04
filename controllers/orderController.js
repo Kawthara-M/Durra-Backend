@@ -9,21 +9,60 @@ const Driver = require("../models/Driver")
 // tested while logged in as jeweler, test again I added service
 const getAllOrders = async (req, res) => {
   try {
+    console.log("hhe")
     const userId = res.locals.payload.id
     const role = res.locals.payload.role
+
     let orders = []
 
     if (role === "Customer") {
       orders = await Order.find({ user: userId })
         .populate("user")
-        .populate("jewelryOrder")
-        .populate("serviceOrder")
+        .populate({
+          path: "jewelryOrder",
+          populate: {
+            path: "jewelry", // populate nested field
+          },
+        })
+        .populate({
+          path: "serviceOrder",
+          populate: {
+            path: "service", // assuming "service" is an ObjectId
+          },
+        })
+
         .populate("shop")
     } else if (role === "Jeweler") {
-      orders = await Order.find({ shop: userId })
+      const shop = await Shop.findOne({ user: userId })
+      if (!shop) {
+        return res.status(404).json({ error: "Shop not found." })
+      }
+      orders = await Order.find({ shop: shop._id })
         .populate("user")
-        .populate("jewelryOrder")
-        .populate("serviceOrder")
+        .populate({
+          path: "jewelryOrder",
+          populate: {
+            path: "jewelry",
+            model: "Jewelry",
+          },
+        })
+        .populate({
+          path: "serviceOrder",
+          populate: {
+            path: "service",
+            model: "Service",
+          },
+        })
+
+      // update to the next block later
+      /* orders = await Order.find({ 
+  shop: shop._id,
+  status: { $nin: ["pending", "cancelled"] }
+})
+.populate("user")
+.populate("jewelryOrder")
+.populate("serviceOrder")
+ */
     } else if (role === "Admin") {
       orders = await Order.find()
         .populate("user")
@@ -47,6 +86,20 @@ const getAllOrders = async (req, res) => {
 const getOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.orderId)
+      .populate("user")
+      .populate({
+        path: "jewelryOrder",
+        populate: {
+          path: "jewelry",
+        },
+      })
+      .populate({
+        path: "serviceOrder",
+        populate: {
+          path: "service",
+        },
+      })
+
     const userId = res.locals.payload.id
     const userRole = res.locals.payload.role
 
@@ -152,28 +205,27 @@ const createOrder = async (req, res) => {
   }
 }
 
-// tested by increasing quantity of same jewelry, adding other jewelry, test again after adding services
+// tested by increasing quantity of same jewelry, adding other jewelry, test again after adding services: tested using insomina
 const updateOrder = async (req, res) => {
   try {
     const userId = res.locals.payload.id
     const { orderId } = req.params
     const {
-      jewelryOrder: updatedItemsFromClient,
-      serviceOrder: updatedServicesFromClient,
+      jewelryOrder: updatedItemsFromClient = [],
+      serviceOrder: updatedServicesFromClient = [],
     } = req.body
 
     if (
-      (!updatedItemsFromClient || !Array.isArray(updatedItemsFromClient)) &&
-      (!updatedServicesFromClient || !Array.isArray(updatedServicesFromClient))
+      (!Array.isArray(updatedItemsFromClient) ||
+        updatedItemsFromClient.length === 0) &&
+      (!Array.isArray(updatedServicesFromClient) ||
+        updatedServicesFromClient.length === 0)
     ) {
       return res.status(400).json({ message: "No valid order data provided." })
     }
 
     const order = await Order.findById(orderId)
-
-    if (!order) {
-      return res.status(404).json({ message: "Order not found." })
-    }
+    if (!order) return res.status(404).json({ message: "Order not found." })
 
     if (order.user.toString() !== userId) {
       return res
@@ -213,14 +265,13 @@ const updateOrder = async (req, res) => {
         })
       }
 
-      // this jewelry already exist in order?
       const existingIndex = updatedItems.findIndex(
         (item) => item.jewelry.toString() === jewelry
       )
 
       if (existingIndex !== -1) {
         if (quantity === 0) {
-          updatedItems.splice(existingIndex, 1)
+          updatedItems.splice(existingIndex, 1) // remove it
         } else {
           updatedItems[existingIndex].quantity = quantity
           updatedItems[existingIndex].totalPrice = totalPrice
@@ -228,88 +279,42 @@ const updateOrder = async (req, res) => {
             updatedItems[existingIndex].notes = notes
           }
         }
-      } else {
-        if (quantity > 0) {
-          updatedItems.push({
-            jewelry,
-            quantity,
-            totalPrice,
-            status: "not-ready",
-            notes: notes || "",
-          })
-        }
-      }
-    }
-
-    let updatedServices = []
-
-    if (Array.isArray(updatedServicesFromClient)) {
-      for (const serviceItem of updatedServicesFromClient) {
-        const { _id, service, jewelry, images, totalPrice, notes } = serviceItem
-
-        if (
-          !service ||
-          !Array.isArray(jewelry) ||
-          jewelry.length === 0 ||
-          totalPrice === undefined
-        ) {
-          return res.status(400).json({
-            message:
-              "Each service must include service ID, at least one jewelry item, and totalPrice.",
-          })
-        }
-
-        const parsedJewelry = []
-
-        for (const j of jewelry) {
-          if (j.platformJewelry) {
-            const pj = await Jewelry.findById(j.platformJewelry)
-            if (!pj) {
-              return res.status(400).json({
-                message: `Platform jewelry not found: ${j.platformJewelry}`,
-              })
-            }
-
-            parsedJewelry.push({ platformJewelry: j.platformJewelry })
-          } else if (j.ownedJewelry) {
-            if (!images || !Array.isArray(images) || images.length === 0) {
-              return res.status(400).json({
-                message: "Images are required for owned jewelry.",
-              })
-            }
-            parsedJewelry.push({ ownedJewelry: j.ownedJewelry })
-          } else {
-            return res.status(400).json({
-              message:
-                "Each jewelry item must be either platformJewelry or ownedJewelry.",
-            })
-          }
-        }
-
-
-        let status = "not-ready"
-        if (_id) {
-          const existingService = order.serviceOrder.find(
-            (s) => s._id.toString() === _id
-          )
-          if (existingService) {
-            status = existingService.status || "not-ready"
-          }
-        }
-
-        updatedServices.push({
-          _id,
-          service,
-          jewelry: parsedJewelry,
-          images: images || [],
+      } else if (quantity > 0) {
+        updatedItems.push({
+          jewelry,
+          quantity,
           totalPrice,
-          status,
           notes: notes || "",
         })
       }
     }
 
-    order.serviceOrder = updatedServices
+    let updatedServices = []
+
+    for (const serviceItem of updatedServicesFromClient) {
+      const { _id, service, jewelry, totalPrice, notes } = serviceItem
+      const { name, images } = jewelry || {}
+
+      if (
+        !service ||
+        !name ||
+        !Array.isArray(images) ||
+        images.length === 0 ||
+        totalPrice === undefined
+      ) {
+        return res.status(400).json({
+          message: "Each service must include service ID and totalPrice.",
+        })
+      }
+
+      updatedServices.push({
+        _id,
+        service,
+        jewelry,
+        totalPrice,
+        notes: notes || "",
+      })
+    }
 
     const totalJewelryPrice = updatedItems.reduce(
       (sum, item) => sum + item.totalPrice,
@@ -326,9 +331,15 @@ const updateOrder = async (req, res) => {
 
     await order.save()
 
+    const populatedOrder = await Order.findById(order._id)
+      .populate("user")
+      .populate("jewelryOrder")
+      .populate("serviceOrder")
+      .populate("shop")
+
     res.status(200).json({
       message: "Order updated successfully.",
-      order,
+      order: populatedOrder,
     })
   } catch (error) {
     console.error("Error updating order:", error)

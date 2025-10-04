@@ -1,18 +1,34 @@
 const Jewelry = require("../models/Jewelry")
 const Shop = require("../models/Shop")
+const { verifyDanatReport } = require("../services/certificationServices.js")
 
-// total price of precious jewelry should be calculated again in front-end after they receive jewelry, I should - the precious total and recalculate it based on karatCost and then add it again
 // tested
 const getAllJewelry = async (req, res) => {
   try {
-    const jewelry = await Jewelry.find({ deleted: false }).populate("shop")
+    const payload = res.locals.payload
+    let jewelry
 
-    res.status(200).json({
-      jewelry,
-    })
+    if (payload && payload.role === "Jeweler") {
+      const shop = await Shop.findOne({ user: payload.id })
+      if (!shop) {
+        return res
+          .status(404)
+          .json({ error: "Shop not found for this jeweler." })
+      }
+
+      jewelry = await Jewelry.find({
+        shop: shop._id,
+        deleted: false,
+      }).populate("shop")
+    } else {
+      jewelry = await Jewelry.find({ deleted: false }).populate("shop")
+    }
+
+    res.status(200).json({ jewelry })
   } catch (error) {
+    console.error("Error fetching jewelry:", error)
     return res.status(500).json({
-      error: "Failure encountred while fetching jewelry.",
+      error: "Failure encountered while fetching jewelry.",
     })
   }
 }
@@ -24,6 +40,7 @@ const getJewelry = async (req, res) => {
       _id: req.params.jewelryId,
       deleted: false,
     }).populate("shop")
+    console.log("here")
     if (!jewelry) {
       return res.status(404).json({
         error: "Jewelry not found. It may have been deleted or does not exist.",
@@ -40,9 +57,21 @@ const getJewelry = async (req, res) => {
   }
 }
 
+const validateGIA = async () => {}
+
 const createJewelry = async (req, res) => {
   try {
     const userId = res.locals.payload.id
+
+    const parseArrayField = (field) => {
+      try {
+        return field ? JSON.parse(field) : []
+      } catch (err) {
+        console.error(`Failed to parse ${field}:`, err)
+        return []
+      }
+    }
+
     const {
       name,
       description,
@@ -51,17 +80,16 @@ const createJewelry = async (req, res) => {
       totalWeight,
       originPrice,
       productionCost,
-      totalPrice,
       limitPerOrder,
-      preciousMaterials,
-      pearls,
-      diamonds,
-      otherMaterials,
-      certifications,
-      shopId,
     } = req.body
 
-    const shop = await Shop.findById(shopId)
+    const preciousMaterials = parseArrayField(req.body.preciousMaterials)
+    const pearls = parseArrayField(req.body.pearls)
+    const diamonds = parseArrayField(req.body.diamonds)
+    const otherMaterials = parseArrayField(req.body.otherMaterials)
+    const certifications = parseArrayField(req.body.certifications)
+
+    const shop = await Shop.findOne({ user: userId })
     if (!shop) {
       return res.status(404).json({
         error: "Shop not found.",
@@ -75,9 +103,26 @@ const createJewelry = async (req, res) => {
       })
     }
 
-    const images = req.files?.map((file) => `/uploads/${file.filename}`) || []
+    const BASE_URL = process.env.BASE_URL
+
+    const images =
+      req.files?.map((file) => `${BASE_URL}/uploads/${file.filename}`) || []
 
     // check here if certifications are valid or not
+    for (let cert of certifications) {
+      if (cert.name.toLowerCase() === "danat") {
+        const result = await verifyDanatReport(
+          cert.reportNumber,
+          cert.reportDate
+        )
+
+        if (result.success) {
+          cert.isVerified = true
+        } else {
+          cert.isVerified = false
+        }
+      }
+    }
 
     const newJewelry = await Jewelry.create({
       shop: shop._id,
@@ -88,7 +133,6 @@ const createJewelry = async (req, res) => {
       totalWeight,
       productionCost,
       originPrice,
-      totalPrice,
       limitPerOrder,
       images,
       preciousMaterials,
@@ -120,9 +164,7 @@ const updateJewelry = async (req, res) => {
       totalWeight,
       originPrice,
       productionCost,
-      totalPrice,
       limitPerOrder,
-      images,
       preciousMaterials,
       pearls,
       diamonds,
@@ -132,7 +174,6 @@ const updateJewelry = async (req, res) => {
 
     const jewelry = await Jewelry.findOne({
       _id: jewelryId,
-      shop: shop._id,
       deleted: false,
     })
     if (!jewelry) {
@@ -153,9 +194,21 @@ const updateJewelry = async (req, res) => {
       })
     }
 
-    if (req.files && req.files.length > 0) {
-      jewelry.images = req.files.map((file) => `/uploads/${file.filename}`)
+    const BASE_URL = process.env.BASE_URL
+
+    let existingImages = []
+    if (req.body.existingImages) {
+      try {
+        existingImages = JSON.parse(req.body.existingImages)
+      } catch (e) {
+        console.error("Failed to parse existingImages:", e)
+      }
     }
+
+    const newImageUrls =
+      req.files?.map((file) => `${BASE_URL}/uploads/${file.filename}`) || []
+
+    jewelry.images = [...existingImages, ...newImageUrls]
 
     jewelry.name = name ?? jewelry.name
     jewelry.description = description ?? jewelry.description
@@ -164,15 +217,23 @@ const updateJewelry = async (req, res) => {
     jewelry.totalWeight = totalWeight ?? jewelry.totalWeight
     jewelry.productionCost = productionCost ?? jewelry.productionCost
     jewelry.originPrice = originPrice ?? jewelry.originPrice
-    jewelry.totalPrice = totalPrice ?? jewelry.totalPrice
     jewelry.limitPerOrder = limitPerOrder ?? jewelry.limitPerOrder
-    jewelry.preciousMaterials = preciousMaterials ?? jewelry.preciousMaterials
-    jewelry.pearls = pearls ?? jewelry.pearls
-    jewelry.diamonds = diamonds ?? jewelry.diamonds
-    jewelry.otherMaterials = otherMaterials ?? jewelry.otherMaterials
+    jewelry.preciousMaterials = preciousMaterials
+      ? JSON.parse(preciousMaterials)
+      : jewelry.preciousMaterials
+
+    jewelry.pearls = pearls ? JSON.parse(pearls) : jewelry.pearls
+
+    jewelry.diamonds = diamonds ? JSON.parse(diamonds) : jewelry.diamonds
+
+    jewelry.otherMaterials = otherMaterials
+      ? JSON.parse(otherMaterials)
+      : jewelry.otherMaterials
 
     // validate certifications
-    jewelry.certifications = certifications ?? jewelry.certifications
+    jewelry.certifications = certifications
+      ? JSON.parse(certifications)
+      : jewelry.certifications
 
     await jewelry.save()
 
