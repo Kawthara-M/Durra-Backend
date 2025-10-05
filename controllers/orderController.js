@@ -133,8 +133,9 @@ const createOrder = async (req, res) => {
       serviceOrder = [],
       totalPrice,
       collectionMethod,
-      address,
     } = req.body
+
+    let { address } = req.body
 
     if (jewelryOrder.length === 0 && serviceOrder.length === 0) {
       return res.status(400).json({ message: "Order cannot be empty." })
@@ -159,12 +160,6 @@ const createOrder = async (req, res) => {
       }
 
       shopId = jewelryItem.shop
-
-      if (jewelryOrder[0].totalPrice !== totalPrice) {
-        return res
-          .status(400)
-          .json({ message: "Total price mismatch for jewelry order." })
-      }
     } else if (serviceOrder.length > 0) {
       const serviceId = serviceOrder[0].service
       const serviceItem = await Service.findById(serviceId)
@@ -376,7 +371,9 @@ const updateOrderStatus = async (req, res) => {
       Jeweler: {
         submitted: ["accepted", "rejected"],
         accepted: ["processing"],
-        processing: ["pickup"],
+        processing: ["pickup", "ready"],
+        ready: ["out"],
+        pickup: ["picked-up"],
       },
       Driver: {
         pickup: ["delivered"],
@@ -387,6 +384,7 @@ const updateOrderStatus = async (req, res) => {
     const allowedTransitions = statusTransitions[role]?.[currentStatus] || []
 
     if (!allowedTransitions.includes(newStatus)) {
+      console.log(newStatus)
       return res.status(403).json({
         message: `${role} cannot change order from '${currentStatus}' to '${newStatus}'`,
       })
@@ -401,6 +399,7 @@ const updateOrderStatus = async (req, res) => {
     } else if (role === "Jeweler") {
       const shop = await Shop.findOne({ user: res.locals.payload.id })
       if (order.shop.toString() !== shop._id.toString()) {
+        console.log("issue here")
         return res
           .status(403)
           .json({ message: "Unauthorized: Not your order." })
@@ -417,7 +416,7 @@ const updateOrderStatus = async (req, res) => {
     await order.save()
 
     // not tested
-    if (newStatus === "pickup" && order.collectionMethod === "delivery") {
+    if (newStatus === "ready" && order.collectionMethod === "delivery") {
       const drivers = await User.find({ role: "driver" })
       if (drivers.length === 0) {
         throw new Error("No delivery men available")
@@ -437,6 +436,19 @@ const updateOrderStatus = async (req, res) => {
         currentLocation: null,
         status: "atShop",
       })
+    }
+    if (newStatus === "out" && order.collectionMethod === "delivery") {
+      const shipment = await Shipment.findOne({ order: orderId })
+
+      if (!shipment) {
+        return res
+          .status(404)
+          .json({ message: "Shipment not found for this order." })
+      }
+
+      shipment.pickedUpAt = new Date()
+      shipment.status="shipped" 
+      await shipment.save()
     }
 
     res.status(200).json({

@@ -16,10 +16,12 @@ const OrderSchema = new Schema(
           ref: "Service",
           required: true,
         },
-        jewelry: {
-          name: { type: String },
-          images: [{ type: [String], default: [] }],
-        },
+        jewelry: [
+          {
+            name: { type: String },
+            images: [{ type: String }],
+          },
+        ],
 
         totalPrice: {
           type: Number,
@@ -73,8 +75,11 @@ const OrderSchema = new Schema(
         "accepted", // shop accepted order
         "rejected", // shop rejected order
         "processing", // shop is working on order
-        "pickup", // ready for pickup by driver or customer
+        "ready", // ready for delivery
+        "out", // out for delivery
+        "pickup", // ready for pickup by customer
         "delivered", // received by customer
+        "picked-up",
         "cancelled", // customer cancelled before shop decides
       ], // ensure they are correct
       default: "pending",
