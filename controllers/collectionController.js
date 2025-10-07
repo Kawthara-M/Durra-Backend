@@ -5,16 +5,29 @@ const Jewelry = require("../models/Jewelry")
 // tested
 const getAllCollections = async (req, res) => {
   try {
-    const collections = await Collection.find()
-      .populate("shop")
-      .populate("jewelry")
+    const payload = res.locals.payload
+    let collections
 
-    res.status(200).json({
-      collections,
-    })
+    if (payload && payload.role === "Jeweler") {
+      const shop = await Shop.findOne({ user: payload.id })
+      if (!shop) {
+        return res
+          .status(404)
+          .json({ error: "Shop not found for this jeweler." })
+      }
+
+      collections = await Collection.find({ shop: shop._id })
+        .populate("shop")
+        .populate("jewelry")
+    } else {
+      collections = await Collection.find().populate("shop").populate("jewelry")
+    }
+
+    res.status(200).json({ collections })
   } catch (error) {
+    console.error("Error fetching collections:", error)
     return res.status(500).json({
-      error: "Failure encountred while fetching collections.",
+      error: "Failure encountered while fetching collections.",
     })
   }
 }
