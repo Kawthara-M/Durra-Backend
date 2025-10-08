@@ -86,11 +86,17 @@ const createCollection = async (req, res) => {
       })
     }
 
+    const BASE_URL = process.env.BASE_URL
+
+    const images =
+      req.files?.map((file) => `${BASE_URL}/uploads/${file.filename}`) || []
+
     const newCollection = await Collection.create({
       shop: shopId,
       name,
       description,
       jewelry,
+      images,
     })
 
     res.status(201).json({
@@ -129,9 +135,9 @@ const updateCollection = async (req, res) => {
     }
 
     const duplicate = await Collection.findOne({
-      _id: { $ne: collectionId }, // not equal
+      _id: { $ne: collectionId },
       shop: shop._id,
-      name: { $regex: `^${name}$`, $options: "i" }, // i for case-insensitive
+      name: { $regex: `^${name}$`, $options: "i" },
     })
 
     if (duplicate) {
@@ -153,9 +159,25 @@ const updateCollection = async (req, res) => {
       })
     }
 
-    collection.name = name
-    collection.description = description
-    collection.jewelry = jewelry
+    const BASE_URL = process.env.BASE_URL
+
+    let existingImages = []
+    if (req.body.existingImages) {
+      try {
+        existingImages = JSON.parse(req.body.existingImages)
+      } catch (e) {
+        console.error("Failed to parse existingImages:", e)
+      }
+    }
+
+    const newImageUrls =
+      req.files?.map((file) => `${BASE_URL}/uploads/${file.filename}`) || []
+
+    collection.images = [...existingImages, ...newImageUrls]
+
+    collection.name = name ?? collection.name
+    collection.description = description ?? collection.description
+    collection.jewelry = jewelry ?? collection.jewelry
 
     await collection.save()
 
@@ -168,6 +190,7 @@ const updateCollection = async (req, res) => {
     return res.status(500).json({ error: error.message })
   }
 }
+
 
 // should test
 const deleteCollection = async (req, res) => {

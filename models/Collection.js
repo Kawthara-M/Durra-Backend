@@ -23,6 +23,15 @@ const CollectionSchema = new Schema(
         required: true,
       },
     ],
+    originPrice: {
+      type: Number,
+      // required: true
+    },
+    images: [{ type: String }],
+    limitPerOrder: {
+      type: Number,
+      required: true,
+    },
   },
   {
     timestamps: true,
