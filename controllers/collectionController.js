@@ -58,13 +58,21 @@ const getCollection = async (req, res) => {
 const createCollection = async (req, res) => {
   try {
     const userId = res.locals.payload.id
-    const { name, description, jewelry, shopId } = req.body
+    let { name, description, limitPerOrder, originPrice, jewelry } = req.body
 
-    const shop = await Shop.findById(shopId)
+    if (typeof jewelry === "string") {
+      try {
+        jewelry = JSON.parse(jewelry)
+      } catch (e) {
+        return res.status(400).json({
+          error: "Invalid jewelry data format.",
+        })
+      }
+    }
+
+    const shop = await Shop.findOne({ user: userId })
     if (!shop) {
-      return res.status(404).json({
-        error: "Shop not found.",
-      })
+      return res.status(404).json({ error: "Shop not found." })
     }
 
     if (shop.user.toString() !== userId) {
@@ -76,7 +84,7 @@ const createCollection = async (req, res) => {
 
     const foundJewelry = await Jewelry.find({
       _id: { $in: jewelry },
-      shop: shopId,
+      shop: shop._id,
     })
 
     if (foundJewelry.length !== jewelry.length) {
@@ -87,16 +95,17 @@ const createCollection = async (req, res) => {
     }
 
     const BASE_URL = process.env.BASE_URL
-
     const images =
       req.files?.map((file) => `${BASE_URL}/uploads/${file.filename}`) || []
 
     const newCollection = await Collection.create({
-      shop: shopId,
+      shop: shop._id,
       name,
       description,
       jewelry,
       images,
+      limitPerOrder,
+      originPrice,
     })
 
     res.status(201).json({
@@ -113,7 +122,8 @@ const updateCollection = async (req, res) => {
   try {
     const { collectionId } = req.params
     const { id: userId, role } = res.locals.payload
-    const { name, description, jewelry } = req.body
+    const { name, description } = req.body
+    const jewelryArray = JSON.parse(req.body.jewelry)
 
     const collection = await Collection.findById(collectionId)
     if (!collection) {
@@ -148,11 +158,11 @@ const updateCollection = async (req, res) => {
     }
 
     const validJewelry = await Jewelry.find({
-      _id: { $in: jewelry },
+      _id: { $in: jewelryArray },
       shop: shop._id,
     })
 
-    if (validJewelry.length !== jewelry.length) {
+    if (validJewelry.length !== jewelryArray.length) {
       return res.status(400).json({
         error:
           "One or more jewelry items are invalid or do not belong to this shop.",
@@ -190,7 +200,6 @@ const updateCollection = async (req, res) => {
     return res.status(500).json({ error: error.message })
   }
 }
-
 
 // should test
 const deleteCollection = async (req, res) => {
