@@ -26,13 +26,13 @@ router.get(
   requestCtrl.getRequest
 )
 
+// not protected because jeweler still doesn't have account
 router.post(
   "/",
-  middleware.stripToken,
-  middleware.verifyToken,
   requestCtrl.createRequest
 )
 
+// I think we should restrict access to admins
 router.put(
   "/:requestId",
   middleware.stripToken,

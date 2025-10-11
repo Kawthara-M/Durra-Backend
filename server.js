@@ -60,7 +60,7 @@ app.use("/collections", collectionRouter)
 app.use("/orders", orderRouter)
 app.use("/addresses", addressRouter)
 // app.use("/reviews", reviewRouter)
-// app.use("drivers", deliveryRouter)
+// app.use("/drivers", deliveryRouter)
 
 // Listener
 app.listen(port, () => {

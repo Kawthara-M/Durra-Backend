@@ -33,7 +33,12 @@ const getAllOrders = async (req, res) => {
       if (!shop) {
         return res.status(404).json({ error: "Shop not found." })
       }
-      orders = await Order.find({ shop: shop._id })
+
+      // to ensure jewelers dont see orders in pending and cancelled states
+      orders = await Order.find({
+        shop: shop._id,
+        status: { $nin: ["pending", "cancelled"] },
+      })
         .populate("user")
         .populate({
           path: "jewelryOrder.item",
@@ -46,16 +51,6 @@ const getAllOrders = async (req, res) => {
             model: "Service",
           },
         })
-
-      // update to the next block later, so jewelers dont see orders in pending and cancelled
-      /* orders = await Order.find({ 
-  shop: shop._id,
-  status: { $nin: ["pending", "cancelled"] }
-})
-.populate("user")
-.populate("jewelryOrder")
-.populate("serviceOrder")
- */
     } else if (role === "Admin") {
       orders = await Order.find()
         .populate("user")
@@ -115,7 +110,7 @@ const getOrder = async (req, res) => {
   }
 }
 
-// tested, and somehow works, test again after service thing
+// tested: using insomnia
 const createOrder = async (req, res) => {
   try {
     const userId = res.locals.payload.id
@@ -143,37 +138,63 @@ const createOrder = async (req, res) => {
     let shopId
 
     if (jewelryOrder.length > 0) {
-      const { item, itemModel } = jewelryOrder[0]
+      for (const orderItem of jewelryOrder) {
+        const { item, itemModel, quantity } = orderItem
 
-      let jewelryItem
+        if (!item || !itemModel) {
+          return res
+            .status(400)
+            .json({ message: "Missing item or itemModel in jewelryOrder." })
+        }
 
-      if (itemModel === "Jewelry") {
-        jewelryItem = await Jewelry.findById(item)
-      } else if (itemModel === "Collection") {
-        jewelryItem = await Collection.findById(item)
-      } else {
-        return res.status(400).json({ message: "Invalid itemModel." })
+        if (itemModel === "Jewelry") {
+          const jewelryDoc = await Jewelry.findById(item)
+          if (!jewelryDoc) {
+            return res.status(404).json({ message: "Jewelry not found." })
+          }
+
+          if (quantity > jewelryDoc.limitPerOrder) {
+            return res.status(400).json({
+              message: `Quantity for jewelry '${jewelryDoc.name}' exceeds limit (${jewelryDoc.limitPerOrder}).`,
+            })
+          }
+
+          shopId = jewelryDoc.shop
+        }
+
+        if (itemModel === "Collection") {
+          const collectionDoc = await Collection.findById(item)
+          if (!collectionDoc) {
+            return res.status(404).json({ message: "Collection not found." })
+          }
+
+          if (quantity > collectionDoc.limitPerOrder) {
+            return res.status(400).json({
+              message: `Quantity for collection '${collectionDoc.name}' exceeds limit (${collectionDoc.limitPerOrder}).`,
+            })
+          }
+
+          shopId = collectionDoc.shop
+        }
       }
-
-      if (!jewelryItem) {
-        return res.status(400).json({ message: "Item not found." })
-      }
-
-      shopId = jewelryItem.shop
     } else if (serviceOrder.length > 0) {
-      const serviceId = serviceOrder[0].service
-      const serviceItem = await Service.findById(serviceId)
+      for (const serviceItem of serviceOrder) {
+        const serviceDoc = await Service.findById(serviceItem.service)
 
-      if (!serviceItem) {
-        return res.status(400).json({ message: "Service item not found." })
-      }
+        if (!serviceDoc) {
+          return res.status(404).json({ message: "Service not found." })
+        }
 
-      shopId = serviceItem.shop
+        if (
+          !Array.isArray(serviceItem.jewelry) ||
+          serviceItem.jewelry.length > serviceDoc.limitPerOrder
+        ) {
+          return res.status(400).json({
+            message: `Too many jewelry items for service '${serviceDoc.name}'. Limit is ${serviceDoc.limitPerOrder}.`,
+          })
+        }
 
-      if (serviceOrder[0].totalPrice !== totalPrice) {
-        return res
-          .status(400)
-          .json({ message: "Total price mismatch for service order." })
+        shopId = serviceDoc.shop
       }
     }
 
@@ -200,7 +221,7 @@ const createOrder = async (req, res) => {
   }
 }
 
-// tested by increasing quantity of same jewelry, adding other jewelry, test again after adding services: tested using insomina, test after collection addition
+// tested: using insomnia
 const updateOrder = async (req, res) => {
   try {
     const userId = res.locals.payload.id
@@ -209,34 +230,34 @@ const updateOrder = async (req, res) => {
       jewelryOrder: updatedItemsFromClient = [],
       serviceOrder: updatedServicesFromClient = [],
     } = req.body
-
+    
     if (
       (!Array.isArray(updatedItemsFromClient) ||
-        updatedItemsFromClient.length === 0) &&
+      updatedItemsFromClient.length === 0) &&
       (!Array.isArray(updatedServicesFromClient) ||
-        updatedServicesFromClient.length === 0)
+      updatedServicesFromClient.length === 0)
     ) {
       return res.status(400).json({ message: "No valid order data provided." })
     }
-
+    
     const order = await Order.findById(orderId)
     if (!order) return res.status(404).json({ message: "Order not found." })
-
-    if (order.user.toString() !== userId) {
-      return res
+      
+      if (order.user.toString() !== userId) {
+        return res
         .status(403)
         .json({ message: "Unauthorized to update this order." })
-    }
-
-    if (order.status !== "pending") {
-      return res
+      }
+      
+      if (order.status !== "pending") {
+        return res
         .status(400)
         .json({ message: "Only pending orders can be updated." })
-    }
-
-    let updatedItems = [...order.jewelryOrder]
-
-    for (const updatedItem of updatedItemsFromClient) {
+      }
+      
+      let updatedItems = [...order.jewelryOrder]
+      
+      for (const updatedItem of updatedItemsFromClient) {
       const { item, itemModel, quantity, totalPrice, notes } = updatedItem
 
       if (
@@ -252,16 +273,35 @@ const updateOrder = async (req, res) => {
       }
 
       let itemDoc
+
       if (itemModel === "Jewelry") {
         itemDoc = await Jewelry.findById(item)
-      } else if (itemModel === "Collection") {
-        itemDoc = await Collection.findById(item)
-      } else {
-        return res.status(400).json({ message: "Invalid itemModel." })
+        if (!itemDoc) {
+          return res
+            .status(400)
+            .json({ message: `Jewelry item not found: ${item}` })
+        }
+
+        if (quantity > itemDoc.limitPerOrder) {
+          return res.status(400).json({
+            message: `Quantity for jewelry '${itemDoc.name}' exceeds limit (${itemDoc.limitPerOrder}).`,
+          })
+        }
       }
 
-      if (!itemDoc) {
-        return res.status(400).json({ message: `Item not found: ${item}` })
+      if (itemModel === "Collection") {
+        itemDoc = await Collection.findById(item)
+        if (!itemDoc) {
+          return res
+            .status(400)
+            .json({ message: `Collection not found: ${item}` })
+        }
+
+        if (quantity > itemDoc.limitPerOrder) {
+          return res.status(400).json({
+            message: `Quantity for collection '${itemDoc.name}' exceeds limit (${itemDoc.limitPerOrder}).`,
+          })
+        }
       }
 
       if (itemDoc.shop.toString() !== order.shop.toString()) {
@@ -297,19 +337,33 @@ const updateOrder = async (req, res) => {
 
     for (const serviceItem of updatedServicesFromClient) {
       const { _id, service, jewelry, totalPrice, notes } = serviceItem
-      const { name, images } = jewelry || {}
 
       if (
         !service ||
-        !name ||
-        !Array.isArray(images) ||
-        images.length === 0 ||
+        !Array.isArray(jewelry) ||
+        jewelry.length === 0 ||
         totalPrice === undefined
       ) {
         return res.status(400).json({
-          message: "Each service must include service ID and totalPrice.",
+          message:
+            "Each service must include service ID, jewelry items, and totalPrice.",
         })
       }
+
+      const serviceDoc = await Service.findById(service)
+      if (!serviceDoc) {
+        return res
+          .status(400)
+          .json({ message: `Service not found: ${service}` })
+      }
+
+
+      if (jewelry.length > serviceDoc.limitPerOrder) {
+        return res.status(400).json({
+          message: `Too many jewelry items for service '${serviceDoc.name}'. Limit is ${serviceDoc.limitPerOrder}.`,
+        })
+      }
+
 
       updatedServices.push({
         _id,
@@ -319,7 +373,8 @@ const updateOrder = async (req, res) => {
         notes: notes || "",
       })
     }
-
+    
+    
     const totalJewelryPrice = updatedItems.reduce(
       (sum, item) => sum + item.totalPrice,
       0
@@ -337,8 +392,12 @@ const updateOrder = async (req, res) => {
 
     const populatedOrder = await Order.findById(order._id)
       .populate("user")
-      .populate("jewelryOrder")
-      .populate("serviceOrder")
+      .populate({
+        path: "jewelryOrder.item",
+      })
+      .populate({
+        path: "serviceOrder.service",
+      })
       .populate("shop")
 
     res.status(200).json({

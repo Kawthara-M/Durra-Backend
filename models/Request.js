@@ -8,14 +8,6 @@ const RequestSchema = new Schema(
       ref: "User",
       required: true,
     },
-    action: {
-      type: String,
-      required: true,
-    },
-    entity: {
-      type: String,
-      required: true,
-    },
       details: {
       type: Schema.Types.Mixed,
     },
