@@ -35,10 +35,16 @@ const OrderSchema = new Schema(
 
     jewelryOrder: [
       {
-        jewelry: {
+        // item and itemModel to allow user to add jewelry / collection
+        item: {
           type: Schema.Types.ObjectId,
-          ref: "Jewelry",
           required: true,
+          refPath: "jewelryOrder.itemModel", 
+        },
+        itemModel: {
+          type: String,
+          required: true,
+          enum: ["Jewelry", "Collection"],
         },
         quantity: {
           type: Number,

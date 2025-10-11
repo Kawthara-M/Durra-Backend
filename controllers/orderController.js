@@ -2,6 +2,7 @@ const Shop = require("../models/Shop")
 const User = require("../models/User")
 const Order = require("../models/Order")
 const Jewelry = require("../models/Jewelry")
+const Collection = require("../models/Collection")
 const Service = require("../models/Service")
 const Shipment = require("../models/Shipment")
 const Driver = require("../models/Driver")
@@ -9,7 +10,6 @@ const Driver = require("../models/Driver")
 // tested while logged in as jeweler, test again I added service
 const getAllOrders = async (req, res) => {
   try {
-    console.log("hhe")
     const userId = res.locals.payload.id
     const role = res.locals.payload.role
 
@@ -19,18 +19,14 @@ const getAllOrders = async (req, res) => {
       orders = await Order.find({ user: userId })
         .populate("user")
         .populate({
-          path: "jewelryOrder",
-          populate: {
-            path: "jewelry", // populate nested field
-          },
+          path: "jewelryOrder.item",
         })
         .populate({
           path: "serviceOrder",
           populate: {
-            path: "service", // assuming "service" is an ObjectId
+            path: "service",
           },
         })
-
         .populate("shop")
     } else if (role === "Jeweler") {
       const shop = await Shop.findOne({ user: userId })
@@ -40,12 +36,9 @@ const getAllOrders = async (req, res) => {
       orders = await Order.find({ shop: shop._id })
         .populate("user")
         .populate({
-          path: "jewelryOrder",
-          populate: {
-            path: "jewelry",
-            model: "Jewelry",
-          },
+          path: "jewelryOrder.item",
         })
+
         .populate({
           path: "serviceOrder",
           populate: {
@@ -54,7 +47,7 @@ const getAllOrders = async (req, res) => {
           },
         })
 
-      // update to the next block later
+      // update to the next block later, so jewelers dont see orders in pending and cancelled
       /* orders = await Order.find({ 
   shop: shop._id,
   status: { $nin: ["pending", "cancelled"] }
@@ -88,11 +81,9 @@ const getOrder = async (req, res) => {
     const order = await Order.findById(req.params.orderId)
       .populate("user")
       .populate({
-        path: "jewelryOrder",
-        populate: {
-          path: "jewelry",
-        },
+        path: "jewelryOrder.item",
       })
+
       .populate({
         path: "serviceOrder",
         populate: {
@@ -124,7 +115,7 @@ const getOrder = async (req, res) => {
   }
 }
 
-// teested, and somehow works, test again after service thing
+// tested, and somehow works, test again after service thing
 const createOrder = async (req, res) => {
   try {
     const userId = res.locals.payload.id
@@ -152,11 +143,20 @@ const createOrder = async (req, res) => {
     let shopId
 
     if (jewelryOrder.length > 0) {
-      const jewelryId = jewelryOrder[0].jewelry
-      const jewelryItem = await Jewelry.findById(jewelryId)
+      const { item, itemModel } = jewelryOrder[0]
+
+      let jewelryItem
+
+      if (itemModel === "Jewelry") {
+        jewelryItem = await Jewelry.findById(item)
+      } else if (itemModel === "Collection") {
+        jewelryItem = await Collection.findById(item)
+      } else {
+        return res.status(400).json({ message: "Invalid itemModel." })
+      }
 
       if (!jewelryItem) {
-        return res.status(400).json({ message: "Jewelry item not found." })
+        return res.status(400).json({ message: "Item not found." })
       }
 
       shopId = jewelryItem.shop
@@ -184,7 +184,7 @@ const createOrder = async (req, res) => {
       serviceOrder,
       totalPrice,
       collectionMethod,
-      status: "pending",
+      status: "pending", // it means in cart
       address,
     })
 
@@ -200,7 +200,7 @@ const createOrder = async (req, res) => {
   }
 }
 
-// tested by increasing quantity of same jewelry, adding other jewelry, test again after adding services: tested using insomina
+// tested by increasing quantity of same jewelry, adding other jewelry, test again after adding services: tested using insomina, test after collection addition
 const updateOrder = async (req, res) => {
   try {
     const userId = res.locals.payload.id
@@ -237,46 +237,55 @@ const updateOrder = async (req, res) => {
     let updatedItems = [...order.jewelryOrder]
 
     for (const updatedItem of updatedItemsFromClient) {
-      const { jewelry, quantity, totalPrice, notes } = updatedItem
+      const { item, itemModel, quantity, totalPrice, notes } = updatedItem
 
-      if (!jewelry || quantity === undefined || totalPrice === undefined) {
+      if (
+        !item ||
+        !itemModel ||
+        quantity === undefined ||
+        totalPrice === undefined
+      ) {
         return res.status(400).json({
           message:
-            "Each jewelry item must include jewelry ID, quantity, and totalPrice.",
+            "Each item must include item ID, itemModel, quantity, and totalPrice.",
         })
       }
 
-      const jewelryDoc = await Jewelry.findById(jewelry)
-      if (!jewelryDoc) {
-        return res
-          .status(400)
-          .json({ message: `Jewelry item not found: ${jewelry}` })
+      let itemDoc
+      if (itemModel === "Jewelry") {
+        itemDoc = await Jewelry.findById(item)
+      } else if (itemModel === "Collection") {
+        itemDoc = await Collection.findById(item)
+      } else {
+        return res.status(400).json({ message: "Invalid itemModel." })
       }
 
-      if (jewelryDoc.shop.toString() !== order.shop.toString()) {
+      if (!itemDoc) {
+        return res.status(400).json({ message: `Item not found: ${item}` })
+      }
+
+      if (itemDoc.shop.toString() !== order.shop.toString()) {
         return res.status(400).json({
-          message:
-            "Jewelry item does not belong to the same shop as the order.",
+          message: "Item does not belong to the same shop as the order.",
         })
       }
 
       const existingIndex = updatedItems.findIndex(
-        (item) => item.jewelry.toString() === jewelry
+        (i) => i.item.toString() === item && i.itemModel === itemModel
       )
 
       if (existingIndex !== -1) {
         if (quantity === 0) {
-          updatedItems.splice(existingIndex, 1) // remove it
+          updatedItems.splice(existingIndex, 1)
         } else {
           updatedItems[existingIndex].quantity = quantity
           updatedItems[existingIndex].totalPrice = totalPrice
-          if (notes !== undefined) {
-            updatedItems[existingIndex].notes = notes
-          }
+          updatedItems[existingIndex].notes = notes || ""
         }
       } else if (quantity > 0) {
         updatedItems.push({
-          jewelry,
+          item,
+          itemModel,
           quantity,
           totalPrice,
           notes: notes || "",
@@ -447,7 +456,7 @@ const updateOrderStatus = async (req, res) => {
       }
 
       shipment.pickedUpAt = new Date()
-      shipment.status="shipped" 
+      shipment.status = "shipped"
       await shipment.save()
     }
 
