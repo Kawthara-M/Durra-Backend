@@ -59,11 +59,13 @@ const getAllRequestsByShop = async (req, res) => {
 const updateRequest = async (req, res) => {
   try {
     const { requestId } = req.params
-    const { status, details, adminNote } = req.body
+    const { status, adminNote } = req.body
+
     const userId = res.locals.payload.id
     const userRole = res.locals.payload.role
 
     const request = await Request.findById(requestId)
+    console.log("req:", request)
     if (!request) {
       return res.status(404).json({ error: "Request not found." })
     }
@@ -82,12 +84,14 @@ const updateRequest = async (req, res) => {
       // should test
       if (status === "approved") {
         const parsedDetails =
-          typeof details === "string" ? JSON.parse(details) : details
+          typeof request.details === "string" ? JSON.parse(request.details) : request.details
         const { email, name, cr, description } = parsedDetails
+
 
         const user = await User.findById(request.user)
 
         if (!user) {
+            console.log("User ID that caused failure:", request.user)
           return res.status(404).json({ error: "User not found." })
         }
 
@@ -109,12 +113,12 @@ const updateRequest = async (req, res) => {
           description: description || "",
         })
 
-        const resetLink = `http://localhost:3010/auth/set-password?token=${resetToken}`
+        const resetLink = `http://localhost:5173/set-password?token=${resetToken}`
         // uncomment later so we dont spam
         await sendEmail({
           to: email,
           subject: "Durra Account Activation",
-          text: `Greetings ${name},\n\nThanks for signing up as a jeweler. You have been assigned access to Durra platform, use this link ${resetLink} to set your password. Please make sure to update your password.This link will expire in 24 hours. If you do not activate your account in time, please contact support to resend the invitation.\n\n- Durra Team`,
+          text: `Greetings ${name},\n\nThanks for signing up as a jeweler. You have been assigned access to Durra platform, use this link ${resetLink} to set your password. This link will expire in 24 hours. If you do not activate your account in time, please contact support to resend the invitation.\n\n- Durra Team`,
         })
 
         return res.status(201).json({
@@ -181,7 +185,7 @@ const createRequest = async (req, res) => {
       role: "Jeweler",
       address,
     })
-    const newRequest = new Request({
+    const newRequest = await Request.create({
       user: user._id,
       details,
       status: "pending",

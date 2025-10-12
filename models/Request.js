@@ -6,7 +6,7 @@ const RequestSchema = new Schema(
     user: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      // required: true,
     },
       details: {
       type: Schema.Types.Mixed,

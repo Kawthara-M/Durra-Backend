@@ -187,7 +187,7 @@ const setPassword = async (req, res) => {
 
     res
       .status(200)
-      .json({ message: "Password set successfully! You can now log in." })
+      .json({ message: "Password set successfully! You can now Sign in." })
   } catch (error) {
     console.error(error)
     res.status(500).json({ error: "Server error setting password" })

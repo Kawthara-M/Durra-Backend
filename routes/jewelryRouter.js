@@ -3,7 +3,12 @@ const jewelryCtrl = require("../controllers/jewelryController")
 const middleware = require("../middleware")
 const upload = require("../middleware/multer")
 
-router.get("/", jewelryCtrl.getAllJewelry)
+router.get(
+  "/",
+  middleware.stripToken,
+  middleware.verifyToken,
+  jewelryCtrl.getAllJewelry
+)
 
 router.get("/:jewelryId", jewelryCtrl.getJewelry)
 
@@ -20,7 +25,7 @@ router.put(
   middleware.stripToken,
   middleware.verifyToken,
   middleware.isJeweler,
-  upload.array("images", 5), 
+  upload.array("images", 5),
   jewelryCtrl.updateJewelry
 )
 router.delete(
