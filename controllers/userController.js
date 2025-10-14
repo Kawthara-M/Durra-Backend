@@ -7,6 +7,8 @@ const Address = require("../models/Address")
 const getUserProfile = async (req, res) => {
   try {
     const user = await User.findById(res.locals.payload.id)
+      .populate("addresses") 
+      .populate("defaultAddress")
 
     if (!user) {
       return res.status(404).send("User not found")
@@ -31,7 +33,7 @@ const getUserProfile = async (req, res) => {
 // tested! test again
 const updateUserProfile = async (req, res) => {
   try {
-    const { fName, lName, email, phone, address, setDefault } = req.body
+    const { fName, lName, email, phone } = req.body
     const userId = res.locals.payload.id
 
     if (email) {
@@ -46,7 +48,12 @@ const updateUserProfile = async (req, res) => {
     if (lName) updateFields.lName = lName
     if (email) updateFields.email = email
     if (phone) updateFields.phone = phone
-    if (address) updateFields.address = address
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateFields },
+      { new: true }
+    )
 
     return res.status(200).json({ user: updatedUser })
   } catch (error) {

@@ -3,11 +3,15 @@ const Schema = mongoose.Schema
 
 const AddressSchema = new mongoose.Schema({
   user: { type: Schema.Types.ObjectId, ref: "User", required: true },
-  name: { type: String, required: true },
-  street: { type: String, required: true },
-  building: { type: String, required: true },
+  name: { type: String },
+  road: { type: String },
+  building: { type: String },
   house: { type: String },
-  city: { type: String, required: true },
+  area: { type: String },
+  governante: { type: String },
+  coordinates: {
+    type: [Number], // [longitude, latitude]
+  },
 })
 
 module.exports = mongoose.model("Address", AddressSchema)

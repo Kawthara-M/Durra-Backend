@@ -9,7 +9,6 @@ const getAllJewelry = async (req, res) => {
     let jewelry
 
     if (payload && payload.role === "Jeweler") {
-      console.log("am her")
       const shop = await Shop.findOne({ user: payload.id })
       if (!shop) {
         return res

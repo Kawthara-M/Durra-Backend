@@ -47,7 +47,7 @@ const getShop = async (req, res) => {
 const updateShop = async (req, res) => {
   try {
     const { shopId } = req.params
-    const { name, cr, description, address } = req.body
+    const { name, cr, description} = req.body
     const { id: userId, role } = res.locals.payload
 
     if (!shopId) {
@@ -75,7 +75,7 @@ const updateShop = async (req, res) => {
 
     const updatedShop = await Shop.findByIdAndUpdate(
       shopId,
-      { name, cr, description, address },
+      { name, cr, description },
       { new: true }
     )
 

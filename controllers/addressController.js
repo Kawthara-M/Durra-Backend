@@ -2,7 +2,6 @@ const Shop = require("../models/Shop")
 const User = require("../models/User")
 const Address = require("../models/Address")
 
-
 // tested for customer
 const getAllAddresses = async (req, res) => {
   try {
@@ -49,16 +48,19 @@ const getAddress = async (req, res) => {
 // tested for customer
 const createAddress = async (req, res) => {
   try {
-    const { name, street, building, house, city } = req.body
+    const { name, road, building, house, area, governante, coordinates } =
+      req.body
     const user = await User.findById(res.locals.payload.id)
 
     const newAddress = await Address.create({
       user: res.locals.payload.id,
       name,
-      city,
+      governante,
+      area,
       building,
-      street,
+      road,
       house,
+      coordinates,
     })
 
     await User.findByIdAndUpdate(user._id, {
@@ -77,7 +79,16 @@ const createAddress = async (req, res) => {
 // tested for customer
 const updateAddress = async (req, res) => {
   try {
-    const { name, street, building, house, city, setDefault } = req.body
+    const {
+      name,
+      road,
+      building,
+      house,
+      governante,
+      area,
+      coordinates,
+      setDefault,
+    } = req.body
     const { addressId } = req.params
     const userId = res.locals.payload.id
     const address = await Address.findById(addressId)
@@ -92,10 +103,12 @@ const updateAddress = async (req, res) => {
       addressId,
       {
         name,
-        street,
+        road,
         building,
         house,
-        city,
+        governante,
+        area,
+        coordinates,
       },
       { new: true }
     )
