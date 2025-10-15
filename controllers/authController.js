@@ -185,12 +185,57 @@ const setPassword = async (req, res) => {
 
     await user.save()
 
-    res
-      .status(200)
-      .json({ message: "Password set successfully! You can now Sign in." })
+    return res.status(200).json({
+      status: "Password Updated!",
+    })
   } catch (error) {
     console.error(error)
     res.status(500).json({ error: "Server error setting password" })
+  }
+}
+
+const forgetPassword = async (req, res) => {
+  try {
+    console.log(res.locals.payload)
+    const { email } = res.locals.payload
+
+    if (!email) {
+      console.log("error")
+      return res.status(400).json({ error: "Email is required" })
+    }
+
+    const user = await User.findOne({ email })
+
+    if (!user) {
+      return res.status(404).json({ error: "No user found with that email" })
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex")
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex")
+
+    user.passwordResetToken = hashedToken
+    user.passwordResetExpires = Date.now() + 60 * 60 * 1000
+
+    await user.save()
+
+    const resetUrl = `http://localhost:5173/set-password?token=${resetToken}`
+    const message = `Hello ${user.fName},\n\nPlease click the link below to reset your password:\n${resetUrl}\n\nIf you did not request this, please ignore this email.`
+
+    await sendEmail({
+      to: user.email,
+      subject: "Password Reset Request",
+      text: message,
+    })
+
+    return res.status(200).json({
+      message: "Password reset link sent to your email.",
+    })
+  } catch (error) {
+    console.error("Forget password error:", error)
+    res.status(500).json({ error: "Failed to process password reset request" })
   }
 }
 
@@ -206,4 +251,5 @@ module.exports = {
   deleteAccount,
   UpdatePassword,
   setPassword,
+  forgetPassword,
 }

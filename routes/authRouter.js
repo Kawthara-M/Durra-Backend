@@ -15,6 +15,13 @@ router.put(
 // reached by new shops trying to set their password for first time
 router.post("/set-password", authCtrl.setPassword)
 
+router.post(
+  "/forget-password",
+  middleware.stripToken,
+  middleware.verifyToken,
+  authCtrl.forgetPassword
+)
+
 router.delete(
   "/:userId",
   middleware.stripToken,
