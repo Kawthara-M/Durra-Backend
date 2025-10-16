@@ -4,7 +4,7 @@ const Shop = require("../models/Shop")
 
 const searchAll = async (req, res) => {
   try {
-    const queryString = req.body.search?.trim()
+    const queryString = req.query.search?.trim()
 
     if (!queryString) {
       return res.status(400).json({ error: "Search query is required" })
@@ -50,9 +50,7 @@ const searchAll = async (req, res) => {
 
     // Shop search fields
     const shopQuery = {
-      $or: [
-        ...regexQueries.map((regex) => ({ name: regex })),
-      ],
+      $or: [...regexQueries.map((regex) => ({ name: regex }))],
     }
 
     const [jewelryResults, serviceResults, shopResults] = await Promise.all([
@@ -81,7 +79,6 @@ const searchAll = async (req, res) => {
     return res.status(500).json({ error: "Internal server error" })
   }
 }
-
 
 module.exports = {
   searchAll,
