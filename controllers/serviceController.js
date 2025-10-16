@@ -63,7 +63,7 @@ const getService = async (req, res) => {
 const createService = async (req, res) => {
   try {
     const userId = res.locals.payload.id
-    const { name, description, price } = req.body
+    const { name, description, price, limitPerOrder } = req.body
 
     if (!name || !price) {
       return res.status(400).json({ error: "Missing required fields." })
@@ -90,6 +90,7 @@ const createService = async (req, res) => {
       description,
       price,
       images,
+      limitPerOrder,
       shop: shop._id,
     })
 

@@ -1,4 +1,3 @@
-const Shop = require("../models/Shop")
 const User = require("../models/User")
 const Address = require("../models/Address")
 
