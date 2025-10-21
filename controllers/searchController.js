@@ -69,10 +69,6 @@ const searchAll = async (req, res) => {
     const totalResults =
       jewelryResults.length + serviceResults.length + shopResults.length
 
-    if (totalResults === 0) {
-      return res.status(404).json({ message: "No results found" })
-    }
-
     return res.status(200).json(results)
   } catch (error) {
     console.error("Search error:", error.message)

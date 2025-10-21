@@ -49,6 +49,7 @@ const addressRouter = require("./routes/addressRouter")
 // const reviewRouter = require("./routes/reviewRouter")
 // const deliveryRouter = require("./routes/deliveryRouter")
 const searchRouter = require("./routes/searchRouter")
+pricesRouter = require("./routes/pricesRouter")
 
 // use Routers
 app.use("/auth", authRouter)
@@ -63,6 +64,7 @@ app.use("/addresses", addressRouter)
 // app.use("/reviews", reviewRouter)
 // app.use("/drivers", deliveryRouter)
 app.use("/search", searchRouter)
+app.use("/metal-prices", pricesRouter)
 
 // Listener
 app.listen(port, () => {
