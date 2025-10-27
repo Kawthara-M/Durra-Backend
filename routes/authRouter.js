@@ -16,6 +16,10 @@ router.put(
 router.post("/set-password", authCtrl.setPassword)
 
 router.post(
+  "/forgetPassword",
+  authCtrl.forgetPassword
+)
+router.post(
   "/forget-password",
   middleware.stripToken,
   middleware.verifyToken,

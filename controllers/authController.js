@@ -196,9 +196,8 @@ const setPassword = async (req, res) => {
 
 const forgetPassword = async (req, res) => {
   try {
-    console.log(res.locals.payload)
-    const { email } = res.locals.payload
-
+    const email = res.locals?.payload?.email || req.body?.email
+    
     if (!email) {
       console.log("error")
       return res.status(400).json({ error: "Email is required" })
