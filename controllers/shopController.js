@@ -47,7 +47,7 @@ const getShop = async (req, res) => {
 const updateShop = async (req, res) => {
   try {
     const { shopId } = req.params
-    const { name, cr, description} = req.body
+    const { name, cr, description } = req.body
     const { id: userId, role } = res.locals.payload
 
     if (!shopId) {
@@ -65,23 +65,29 @@ const updateShop = async (req, res) => {
     const isOwnerJeweler = role === "Jeweler" && shop.user.toString() === userId
 
     if (!isAdmin && !isOwnerJeweler) {
-      return res
-        .status(403)
-        .json({
-          error:
-            "Unauthorized: You do not have permission to update this shop.",
-        })
+      return res.status(403).json({
+        error: "Unauthorized: You do not have permission to update this shop.",
+      })
     }
 
-    const updatedShop = await Shop.findByIdAndUpdate(
-      shopId,
-      { name, cr, description },
-      { new: true }
-    )
+    const BASE_URL = process.env.BASE_URL
 
-    return res
-      .status(200)
-      .json({ message: "Shop data edited successfully.", updatedShop })
+    let logo = shop.logo 
+    if (req.file) {
+      logo = `${BASE_URL}/uploads/${req.file.filename}`
+    }
+
+    shop.name = name ?? shop.name
+    shop.cr = cr ?? shop.cr
+    shop.description = description ?? shop.description
+    shop.logo = logo
+
+    await shop.save()
+
+    return res.status(200).json({
+      message: "Shop updated successfully.",
+      shop,
+    })
   } catch (error) {
     console.error("Error editing shop:", error)
     return res.status(500).json({ error: error.message })

@@ -13,8 +13,6 @@ router.get(
 )
 router.get("/:serviceId", serviceCtrl.getService)
 
-
-
 router.post(
   "/",
   middleware.stripToken,

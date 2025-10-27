@@ -9,7 +9,6 @@ const ShopSchema = new Schema(
       required: true,
       unique: true,
     },
-    //by name I mean the shop name
     name: {  
       type: String,
       default: "",
@@ -19,6 +18,10 @@ const ShopSchema = new Schema(
       default: "",
     },
     description: {
+      type: String,
+      default: "",
+    },
+    logo: {
       type: String,
       default: "",
     },
