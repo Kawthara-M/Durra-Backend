@@ -205,7 +205,7 @@ const createOrder = async (req, res) => {
       serviceOrder,
       totalPrice,
       collectionMethod,
-      status: "pending", // it means in cart
+      status: "pending", 
       address,
     })
 

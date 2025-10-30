@@ -1,6 +1,7 @@
 const Jewelry = require("../models/Jewelry")
 const Service = require("../models/Service")
 const Shop = require("../models/Shop")
+const Collection = require("../models/Collection")
 
 const searchAll = async (req, res) => {
   try {
@@ -16,7 +17,6 @@ const searchAll = async (req, res) => {
       $options: "i",
     }))
 
-    // Jewelry search fields
     const jewelryQuery = {
       $and: [
         { deleted: false },
@@ -35,7 +35,6 @@ const searchAll = async (req, res) => {
       ],
     }
 
-    // Service search fields
     const serviceQuery = {
       $and: [
         { deleted: false },
@@ -48,26 +47,43 @@ const searchAll = async (req, res) => {
       ],
     }
 
-    // Shop search fields
+    const collectionQuery = {
+      $and: [
+        {
+          $or: [
+            ...regexQueries.map((regex) => ({ name: regex })),
+            ...regexQueries.map((regex) => ({ description: regex })),
+          ],
+        },
+      ],
+    }
+
     const shopQuery = {
       $or: [...regexQueries.map((regex) => ({ name: regex }))],
     }
 
-    const [jewelryResults, serviceResults, shopResults] = await Promise.all([
-      Jewelry.find(jewelryQuery).populate("shop"),
-      Service.find(serviceQuery).populate("shop"),
-      Shop.find(shopQuery),
-    ])
+    const [jewelryResults, serviceResults, collectionResults, shopResults] =
+      await Promise.all([
+        Jewelry.find(jewelryQuery).populate("shop"),
+        Service.find(serviceQuery).populate("shop"),
+        Collection.find(collectionQuery).populate({
+          path: "jewelry",
+          populate: [
+            "preciousMaterials",
+            "diamonds",
+            "pearls",
+            "otherMaterials",
+          ],
+        }),
+        Shop.find(shopQuery),
+      ])
 
-    // Combine all results
     const results = {
       jewelry: jewelryResults,
       services: serviceResults,
+      collections: collectionResults,
       shops: shopResults,
     }
-
-    const totalResults =
-      jewelryResults.length + serviceResults.length + shopResults.length
 
     return res.status(200).json(results)
   } catch (error) {

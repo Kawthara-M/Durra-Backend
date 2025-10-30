@@ -5,8 +5,6 @@ const upload = require("../middleware/multer")
 
 router.get(
   "/",
-  middleware.stripToken,
-  middleware.verifyToken,
   jewelryCtrl.getAllJewelry
 )
 
