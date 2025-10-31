@@ -3,6 +3,7 @@ const Shop = require("../models/Shop")
 const User = require("../models/User")
 const Jewelry = require("../models/Jewelry")
 const Collection = require("../models/Collection")
+const Service = require("../models/Service")
 const Order = require("../models/Order")
 const Address = require("../models/Address")
 const Request = require("../models/Request")
@@ -43,6 +44,38 @@ const getShop = async (req, res) => {
   }
 }
 
+const getProducts = async (req, res) => {
+  try {
+    const shop = await Shop.findById(req.params.shopId)
+    if (!shop) {
+      return res.status(404).json({
+        error: "Shop not found. It may have been deleted or does not exist.",
+      })
+    }
+    const jewelry = await Jewelry.find({
+      shop: req.params.shopId,
+      deleted: false,
+    })
+    const service = await Service.find({
+      shop: req.params.shopId,
+      deleted: false,
+    })
+    const collection = await Collection.find({
+      shop: req.params.shopId,
+    })
+
+    return res.status(200).json({
+      jewelry,
+      service,
+      collection,
+    })
+  } catch (error) {
+    return res.status(500).json({
+      error: "Failure encountred while fetching this shop's products.",
+    })
+  }
+}
+
 //should test
 const updateShop = async (req, res) => {
   try {
@@ -72,7 +105,7 @@ const updateShop = async (req, res) => {
 
     const BASE_URL = process.env.BASE_URL
 
-    let logo = shop.logo 
+    let logo = shop.logo
     if (req.file) {
       logo = `${BASE_URL}/uploads/${req.file.filename}`
     }
@@ -150,6 +183,7 @@ Durra Team`,
 module.exports = {
   getAllShops,
   getShop,
+  getProducts,
   updateShop,
   deleteShop,
 }
