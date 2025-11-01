@@ -10,14 +10,13 @@ const transporter = nodemailer.createTransport({
 })
 
 async function sendEmail({ to, subject, text, html }) {
-  console.log("Preparing to send email to:", to) 
 
   if (!to || typeof to !== "string" || !to.includes("@")) {
     throw new Error("Invalid recipient email address.")
   }
 
   const mailOptions = {
-    from: `"Durra Support" <${process.env.EMAIL_USERNAME}>`,
+    from: `"DURRA Support" <${process.env.EMAIL_USERNAME}>`,
     to,
     subject,
     text,

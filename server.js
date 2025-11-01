@@ -30,6 +30,7 @@ app.use(morgan("dev"))
 app.use(express.static(path.join(__dirname, "public")))
 
 app.use("/uploads", express.static(uploadsDir))
+app.use("/assets", express.static(path.join(__dirname, "assets")))
 
 // Root Route
 app.get("/", (req, res) => {
@@ -47,9 +48,10 @@ const collectionRouter = require("./routes/collectionRouter")
 const orderRouter = require("./routes/orderRouter")
 const addressRouter = require("./routes/addressRouter")
 // const reviewRouter = require("./routes/reviewRouter")
+// const wishlistRouter = require("./routes/wishlistRouter")
 // const deliveryRouter = require("./routes/deliveryRouter")
 const searchRouter = require("./routes/searchRouter")
-pricesRouter = require("./routes/pricesRouter")
+const pricesRouter = require("./routes/pricesRouter")
 
 // use Routers
 app.use("/auth", authRouter)
@@ -62,6 +64,7 @@ app.use("/collections", collectionRouter)
 app.use("/orders", orderRouter)
 app.use("/addresses", addressRouter)
 // app.use("/reviews", reviewRouter)
+// app.use("/wishlist", wishlistRouter)
 // app.use("/drivers", deliveryRouter)
 app.use("/search", searchRouter)
 app.use("/metal-prices", pricesRouter)

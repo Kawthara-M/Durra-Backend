@@ -4,8 +4,10 @@ const middleware = require("../middleware/index.js")
 const validatePassword = require("../validators/passwordValidator.js")
 const { createUser } = require("../services/userServices.js")
 const { sendEmail } = require("../services/emailService")
+const path = require("path")
 
 // tested: I created an admin user, a jeweler user, and a customer user
+// style the email
 const SignUp = async (req, res) => {
   try {
     const { fName, lName, email, phone, password, confirmPassword, role } =
@@ -73,6 +75,7 @@ const SignIn = async (req, res) => {
 }
 
 // tested: deleted customer account
+// style the email
 const deleteAccount = async (req, res) => {
   try {
     const userId = req.params.userId
@@ -89,7 +92,7 @@ const deleteAccount = async (req, res) => {
     }
     await sendEmail({
       to: user.email,
-      subject: "Account Deleted!",
+      subject: "Account Deletion",
       text: `Greetings ${user.fName},\n\n Your account has been successfully deleted.\n\n- Durra Team`,
     })
 
@@ -197,16 +200,15 @@ const setPassword = async (req, res) => {
 const forgetPassword = async (req, res) => {
   try {
     const email = res.locals?.payload?.email || req.body?.email
-    
+
     if (!email) {
-      console.log("error")
       return res.status(400).json({ error: "Email is required" })
     }
 
     const user = await User.findOne({ email })
 
     if (!user) {
-      return res.status(404).json({ error: "No user found with that email" })
+      return res.status(404).json({ error: "No user found with this email" })
     }
 
     const resetToken = crypto.randomBytes(32).toString("hex")
@@ -221,12 +223,55 @@ const forgetPassword = async (req, res) => {
     await user.save()
 
     const resetUrl = `http://localhost:5173/set-password?token=${resetToken}`
-    const message = `Hello ${user.fName},\n\nPlease click the link below to reset your password:\n${resetUrl}\n\nIf you did not request this, please ignore this email.`
+
+    const assetUrl = "http://localhost:3010/assets/DURRA.png"
+    console.log(assetUrl)
 
     await sendEmail({
       to: user.email,
-      subject: "Password Reset Request",
-      text: message,
+      subject: "Reset Your Durra Password",
+      html: `
+  <div style="font-family:Arial, sans-serif; background:#f7f7f7; padding:2em; color:#333;">
+    <div style="max-width:90%; margin:auto; background:#ffffff; padding:2.2em; border-radius:0.5em; border:0.07em solid #e8e8e8;">
+
+      <h2 style="color:#000; font-size:1.5em; margin-bottom:1em;">Reset Your Password</h2>
+
+      <p style="font-size:1em; line-height:1.6;">
+        Greetings ${user.fName},
+      </p>
+
+      <p style="font-size:1em; line-height:1.6; margin-bottom:1.5em;">
+        DURRA Platform has received a request to reset your Durra account password.
+        Click the button below to reset it.
+      </p>
+
+      <a href="${resetUrl}" style="
+        display:inline-block;
+        background:#6f0101;
+        color:#fff;
+        padding:0.8em 1.4em;
+        text-decoration:none;
+        font-weight:bold;
+        border-radius:0.4em;
+      ">Reset Password</a>
+
+      <p style="font-size:0.9em; color:#777; margin-top:2em;">
+        If you did not request a password reset, you can safely ignore this email.
+      </p>
+
+      <div style="margin-top:2.5em; text-align:center;">
+        <img src="cid:durraLogo" alt="Durra Logo" style="max-width:40%; height:auto; opacity:0.9;" />
+      </div>
+    </div>
+  </div>
+  `,
+      attachments: [
+        {
+          filename: "durra-logo.png",
+          path: assetUrl,
+          cid: "durraLogo",
+        },
+      ],
     })
 
     return res.status(200).json({
