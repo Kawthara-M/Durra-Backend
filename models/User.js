@@ -19,12 +19,6 @@ const UserSchema = mongoose.Schema(
       type: String,
       required: true,
     },
-    addresses: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "Address",
-      },
-    ],
     defaultAddress: {
       type: Schema.Types.ObjectId,
       ref: "Address",
