@@ -1,7 +1,6 @@
 const User = require("../models/User")
 const Driver = require("../models/Driver")
 const Shop = require("../models/Shop")
-const Address = require("../models/Address")
 
 // tested for admin, customer, and jeweler
 const getUserProfile = async (req, res) => {
