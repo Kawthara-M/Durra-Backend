@@ -4,7 +4,6 @@ const middleware = require("../middleware/index.js")
 const validatePassword = require("../validators/passwordValidator.js")
 const { createUser } = require("../services/userServices.js")
 const { sendEmail } = require("../services/emailService")
-const path = require("path")
 
 // tested: I created an admin user, a jeweler user, and a customer user
 // style the email
@@ -222,10 +221,6 @@ const forgetPassword = async (req, res) => {
 
     await user.save()
 
-    const resetUrl = `http://localhost:5173/set-password?token=${resetToken}`
-
-    const assetUrl = "http://localhost:3010/assets/DURRA.png"
-    console.log(assetUrl)
 
     await sendEmail({
       to: user.email,
@@ -265,13 +260,6 @@ const forgetPassword = async (req, res) => {
     </div>
   </div>
   `,
-      attachments: [
-        {
-          filename: "durra-logo.png",
-          path: assetUrl,
-          cid: "durraLogo",
-        },
-      ],
     })
 
     return res.status(200).json({
