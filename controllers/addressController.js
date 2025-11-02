@@ -47,8 +47,16 @@ const getAddress = async (req, res) => {
 // tested for customer
 const createAddress = async (req, res) => {
   try {
-    const { name, road, building, house, area, governante, coordinates } =
-      req.body
+    const {
+      name,
+      road,
+      building,
+      house,
+      area,
+      governante,
+      coordinates,
+      setDefault,
+    } = req.body
     const user = await User.findById(res.locals.payload.id)
 
     const newAddress = await Address.create({
@@ -62,9 +70,11 @@ const createAddress = async (req, res) => {
       coordinates,
     })
 
-    await User.findByIdAndUpdate(user._id, {
-      $push: { addresses: newAddress._id },
-    })
+    if (setDefault === true || setDefault === "true") {
+      await User.findByIdAndUpdate(user._id, {
+        defaultAddress: newAddress._id,
+      })
+    }
 
     return res.status(201).json({
       message: "Address Successfully Created!",
@@ -140,10 +150,6 @@ const deleteAddress = async (req, res) => {
         .status(403)
         .json({ message: "Unauthorized to delete this address" })
     }
-
-    await User.findByIdAndUpdate(userId, {
-      $pull: { addresses: addressId },
-    })
 
     await Address.findByIdAndDelete(addressId)
 

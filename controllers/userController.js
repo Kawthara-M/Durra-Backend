@@ -7,8 +7,6 @@ const Address = require("../models/Address")
 const getUserProfile = async (req, res) => {
   try {
     const user = await User.findById(res.locals.payload.id)
-      .populate("addresses") 
-      .populate("defaultAddress")
 
     if (!user) {
       return res.status(404).send("User not found")

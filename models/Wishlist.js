@@ -7,7 +7,7 @@ const WishlistSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      unique: true, // one wishlist per user
+      unique: true, 
     },
 
     items: [
