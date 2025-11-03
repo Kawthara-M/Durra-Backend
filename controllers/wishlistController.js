@@ -1,13 +1,16 @@
 const Wishlist = require("../models/Wishlist")
 const Service = require("../models/Service")
 const Jewelry = require("../models/Jewelry")
+const Collection = require("../models/Collection")
 
-// not tested
+// tested from frontend
 const getWishlist = async (req, res) => {
   try {
     const userId = res.locals.payload.id
 
-    const wishlist = await Wishlist.findOne({ user: userId })
+    const wishlist = await Wishlist.findOne({ user: userId }).populate({
+      path: "items.favouritedItem",
+    })
 
     if (!wishlist) {
       return res.status(404).json({ error: `Wishlist not found.` })
@@ -20,7 +23,7 @@ const getWishlist = async (req, res) => {
   }
 }
 
-// not tested
+// tested from frontend
 const createWishlist = async (req, res) => {
   try {
     const userId = res.locals.payload.id
@@ -59,26 +62,40 @@ const createWishlist = async (req, res) => {
   }
 }
 
-// not tested
+// tested from frontend
 const updateWishlist = async (req, res) => {
   try {
     const userId = res.locals.payload.id
-    const newItems = req.body.items 
+    let { items } = req.body
 
-    if (!Array.isArray(newItems)) {
+    if (!Array.isArray(items)) {
       return res.status(400).json({ error: "items must be an array" })
+    }
+
+    const uniqueItems = []
+    const seen = new Set() // Set is used to avoid duplicates
+
+    for (const it of items) {
+      const id = it.favouritedItem.toString()
+      if (!seen.has(id)) {
+        seen.add(id)
+        uniqueItems.push(it)
+      }
     }
 
     const updatedWishlist = await Wishlist.findOneAndUpdate(
       { user: userId },
-      { $set: { items: newItems } },
+      { $set: { items: uniqueItems } },
+      { new: true }
     )
 
-    return res.json({
-      wishlist: updatedWishlist,
-    })
+    if (!updatedWishlist) {
+      return res.status(404).json({ error: "Wishlist not found" })
+    }
+
+    res.json({ wishlist: updatedWishlist })
   } catch (error) {
-    console.error("Update Wishlist Error:", error)
+    console.error(error)
     res.status(500).json({ error: "Failed to update wishlist" })
   }
 }
