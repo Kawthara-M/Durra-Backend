@@ -3,7 +3,7 @@ const serviceCtrl = require("../controllers/serviceController")
 const middleware = require("../middleware")
 const upload = require("../middleware/multer")
 
-
+router.get("/shop/:shopId", serviceCtrl.getServicesByShopId)
 router.get("/", serviceCtrl.getAllServices)
 router.get(
   "/shop",

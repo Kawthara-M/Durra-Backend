@@ -9,6 +9,7 @@ router.get(
 )
 
 router.get("/:jewelryId", jewelryCtrl.getJewelry)
+router.get("/shop/:shopId", jewelryCtrl.getJewelryByShop)
 
 router.post(
   "/",
