@@ -1,6 +1,6 @@
 const Jewelry = require("../models/Jewelry")
 const Shop = require("../models/Shop")
-const mongoose = require("mongoose")
+const mongoose = require("mongoose") 
 const { verifyDanatReport } = require("../services/certificationServices.js")
 
 // tested
@@ -371,6 +371,7 @@ const deleteJewelry = async (req, res) => {
 module.exports = {
   getAllJewelry,
   getJewelry,
+  getJewelryByShop,
   getJewelryByShop,
   createJewelry,
   deleteJewelry,
