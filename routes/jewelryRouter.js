@@ -3,12 +3,10 @@ const jewelryCtrl = require("../controllers/jewelryController")
 const middleware = require("../middleware")
 const upload = require("../middleware/multer")
 
-router.get(
-  "/",
-  jewelryCtrl.getAllJewelry
-)
+router.get("/", jewelryCtrl.getAllJewelry)
 
 router.get("/:jewelryId", jewelryCtrl.getJewelry)
+router.get("/shop/:shopId", jewelryCtrl.getJewelryByShop)
 
 router.post(
   "/",
@@ -16,7 +14,7 @@ router.post(
   middleware.verifyToken,
   middleware.isJeweler,
   upload.array("images", 5),
-  jewelryCtrl.createJewelry
+  jewelryCtrl.createJewelry,
 )
 router.put(
   "/:jewelryId",

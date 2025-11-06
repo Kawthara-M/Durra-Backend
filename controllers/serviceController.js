@@ -58,6 +58,21 @@ const getService = async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch service." })
   }
 }
+const getServicesByShopId = async (req, res) => {
+  try {
+    const { shopId } = req.params
+    
+    const services = await Service.find({ 
+      shop: shopId,
+      deleted: false 
+    }).populate("shop")
+
+    return res.status(200).json({ services })
+  } catch (error) {
+    console.error("Error fetching services by shop:", error)
+    return res.status(500).json({ error: "Failed to fetch services." })
+  }
+}
 
 // tested from frontend!
 const createService = async (req, res) => {
@@ -192,6 +207,7 @@ module.exports = {
   getAllServices,
   getService,
   getAllServicesByShop,
+  getServicesByShopId,
   createService,
   updateService,
   deleteService,
