@@ -95,19 +95,12 @@ const createJewelry = async (req, res) => {
 
     const {
       name,
-
       description,
-
       type,
-
       mainMaterial,
-
       totalWeight,
-
       originPrice,
-
       productionCost,
-
       limitPerOrder,
     } = req.body
 
@@ -161,33 +154,19 @@ const createJewelry = async (req, res) => {
 
     const newJewelry = await Jewelry.create({
       shop: shop._id,
-
       name,
-
       description,
-
       type,
-
       mainMaterial,
-
       totalWeight,
-
       productionCost,
-
       originPrice,
-
       limitPerOrder,
-
       images,
-
       preciousMaterials,
-
       pearls,
-
       diamonds,
-
       otherMaterials,
-
       certifications,
     })
 
@@ -211,29 +190,17 @@ const updateJewelry = async (req, res) => {
 
     const {
       name,
-
       description,
-
       type,
-
       mainMaterial,
-
       totalWeight,
-
       originPrice,
-
       productionCost,
-
       limitPerOrder,
-
       preciousMaterials,
-
       pearls,
-
       diamonds,
-
       otherMaterials,
-
       certifications,
     } = req.body
 
