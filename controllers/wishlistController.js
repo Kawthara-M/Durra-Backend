@@ -11,6 +11,7 @@ const getWishlist = async (req, res) => {
     const wishlist = await Wishlist.findOne({ user: userId }).populate({
       path: "items.favouritedItem",
     })
+    console.log(wishlist)
 
     if (!wishlist) {
       return res.status(404).json({ error: `Wishlist not found.` })
@@ -27,29 +28,47 @@ const getWishlist = async (req, res) => {
 const createWishlist = async (req, res) => {
   try {
     const userId = res.locals.payload.id
-    const { favouritedItem, favouritedItemType } = req.body
+    const { items, favouritedItem, favouritedItemType } = req.body
 
-    if (!["Service", "Jewelry", "Collection"].includes(favouritedItemType)) {
-      return res.status(400).json({ error: "Invalid Type." })
+    // Support both { items: [...] } and single item creation
+    const entries =
+      items && Array.isArray(items)
+        ? items
+        : [{ favouritedItem, favouritedItemType }]
+
+    // Validate all entries
+    for (const entry of entries) {
+      if (
+        !["Service", "Jewelry", "Collection"].includes(entry.favouritedItemType)
+      ) {
+        return res
+          .status(400)
+          .json({ error: `Invalid type: ${entry.favouritedItemType}` })
+      }
     }
 
-    let item
-    if (favouritedItemType === "Service") {
-      item = await Service.findById(favouritedItem)
-    } else if (favouritedItemType === "Jewelry") {
-      item = await Jewelry.findById(favouritedItem)
-    } else {
-      item = await Collection.findById(favouritedItem)
+    // Optionally validate that all items exist
+    for (const entry of entries) {
+      let itemModel
+      if (entry.favouritedItemType === "Service") itemModel = Service
+      else if (entry.favouritedItemType === "Jewelry") itemModel = Jewelry
+      else itemModel = Collection
+
+      const found = await itemModel.findById(entry.favouritedItem)
+      if (!found) {
+        return res
+          .status(404)
+          .json({ error: `${entry.favouritedItemType} not found.` })
+      }
     }
 
-    if (!item) {
-      return res.status(404).json({ error: `${favouritedItemType} not found.` })
-    }
-
+    // Create wishlist
     const newWishlist = await Wishlist.create({
       user: userId,
-      favouritedItem,
-      favouritedItemType,
+      items: entries.map((e) => ({
+        favouritedItem: e.favouritedItem,
+        favouritedItemType: e.favouritedItemType,
+      })),
     })
 
     res.status(201).json({
@@ -67,6 +86,7 @@ const updateWishlist = async (req, res) => {
   try {
     const userId = res.locals.payload.id
     let { items } = req.body
+    console.log(req.body)
 
     if (!Array.isArray(items)) {
       return res.status(400).json({ error: "items must be an array" })

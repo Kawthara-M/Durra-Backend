@@ -1,36 +1,43 @@
 const Jewelry = require("../models/Jewelry")
 const Shop = require("../models/Shop")
-const mongoose = require("mongoose") 
+const mongoose = require("mongoose")
 const { verifyDanatReport } = require("../services/certificationServices.js")
 
 // tested
 const getAllJewelry = async (req, res) => {
   try {
-    const payload = res.locals.payload
     let jewelry
 
-    if (payload && payload.role === "Jeweler") {
-      const shop = await Shop.findOne({ user: payload.id })
-      if (!shop) {
-        return res
-          .status(404)
-          .json({ error: "Shop not found for this jeweler." })
-      }
-
-      jewelry = await Jewelry.find({
-        shop: shop._id,
-        deleted: false,
-      }).populate("shop")
-    } else {
-      jewelry = await Jewelry.find({ deleted: false }).populate("shop")
-    }
+    jewelry = await Jewelry.find({ deleted: false }).populate("shop")
 
     res.status(200).json({ jewelry })
   } catch (error) {
     console.error("Error fetching jewelry:", error)
-    return res.status(500).json({
-      error: "Failure encountered while fetching jewelry.",
-    })
+    return res
+      .status(500)
+      .json({ error: "Failure encountered while fetching jewelry." })
+  }
+}
+
+const getJewelryForJeweler = async (req, res) => {
+  try {
+    const payload = res.locals.payload 
+
+    const shop = await Shop.findOne({ user: payload.id })
+    if (!shop) {
+      return res.status(404).json({ error: "Shop not found for this jeweler." })
+    }
+    const jewelry = await Jewelry.find({
+      shop: shop._id,
+      deleted: false,
+    }).populate("shop")
+
+    return res.status(200).json({ jewelry })
+  } catch (error) {
+    console.error("Error fetching jeweler's jewelry:", error)
+    return res
+      .status(500)
+      .json({ error: "Failed to fetch jewelry for jeweler." })
   }
 }
 
@@ -339,7 +346,7 @@ module.exports = {
   getAllJewelry,
   getJewelry,
   getJewelryByShop,
-  getJewelryByShop,
+  getJewelryForJeweler,
   createJewelry,
   deleteJewelry,
   updateJewelry,
