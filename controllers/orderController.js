@@ -230,7 +230,6 @@ const updateOrder = async (req, res) => {
       jewelryOrder: updatedItemsFromClient = [],
       serviceOrder: updatedServicesFromClient = [],
     } = req.body
-    
     if (
       (!Array.isArray(updatedItemsFromClient) ||
       updatedItemsFromClient.length === 0) &&
@@ -322,7 +321,7 @@ const updateOrder = async (req, res) => {
           updatedItems[existingIndex].totalPrice = totalPrice
           updatedItems[existingIndex].notes = notes || ""
         }
-      } else if (quantity > 0) {
+      } else {
         updatedItems.push({
           item,
           itemModel,
