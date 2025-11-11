@@ -75,6 +75,7 @@ const getOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.orderId)
       .populate("user")
+      .populate("shop")
       .populate({
         path: "jewelryOrder.item",
       })
@@ -205,7 +206,7 @@ const createOrder = async (req, res) => {
       serviceOrder,
       totalPrice,
       collectionMethod,
-      status: "pending", 
+      status: "pending",
       address,
     })
 
@@ -232,31 +233,32 @@ const updateOrder = async (req, res) => {
     } = req.body
     if (
       (!Array.isArray(updatedItemsFromClient) ||
-      updatedItemsFromClient.length === 0) &&
+        updatedItemsFromClient.length === 0) &&
       (!Array.isArray(updatedServicesFromClient) ||
-      updatedServicesFromClient.length === 0)
+        updatedServicesFromClient.length === 0)
     ) {
       return res.status(400).json({ message: "No valid order data provided." })
     }
-    
+
+
     const order = await Order.findById(orderId)
     if (!order) return res.status(404).json({ message: "Order not found." })
-      
-      if (order.user.toString() !== userId) {
-        return res
+
+    if (order.user.toString() !== userId) {
+      return res
         .status(403)
         .json({ message: "Unauthorized to update this order." })
-      }
-      
-      if (order.status !== "pending") {
-        return res
+    }
+
+    if (order.status !== "pending") {
+      return res
         .status(400)
         .json({ message: "Only pending orders can be updated." })
-      }
-      
-      let updatedItems = [...order.jewelryOrder]
-      
-      for (const updatedItem of updatedItemsFromClient) {
+    }
+
+    let updatedItems = [...order.jewelryOrder]
+
+    for (const updatedItem of updatedItemsFromClient) {
       const { item, itemModel, quantity, totalPrice, notes } = updatedItem
 
       if (
@@ -340,7 +342,6 @@ const updateOrder = async (req, res) => {
       if (
         !service ||
         !Array.isArray(jewelry) ||
-        jewelry.length === 0 ||
         totalPrice === undefined
       ) {
         return res.status(400).json({
@@ -356,13 +357,11 @@ const updateOrder = async (req, res) => {
           .json({ message: `Service not found: ${service}` })
       }
 
-
       if (jewelry.length > serviceDoc.limitPerOrder) {
         return res.status(400).json({
           message: `Too many jewelry items for service '${serviceDoc.name}'. Limit is ${serviceDoc.limitPerOrder}.`,
         })
       }
-
 
       updatedServices.push({
         _id,
@@ -372,8 +371,7 @@ const updateOrder = async (req, res) => {
         notes: notes || "",
       })
     }
-    
-    
+
     const totalJewelryPrice = updatedItems.reduce(
       (sum, item) => sum + item.totalPrice,
       0

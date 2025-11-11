@@ -27,7 +27,10 @@ const getAllShops = async (req, res) => {
 // tested
 const getShop = async (req, res) => {
   try {
-    const shop = await Shop.findById(req.params.shopId).populate("user")
+    const shop = await Shop.findById(req.params.shopId).populate({
+      path: "user",
+      populate: { path: "defaultAddress" },
+    })
     if (!shop) {
       return res.status(404).json({
         error: "Shop not found. It may have been deleted or does not exist.",
