@@ -240,7 +240,6 @@ const updateOrder = async (req, res) => {
       return res.status(400).json({ message: "No valid order data provided." })
     }
 
-
     const order = await Order.findById(orderId)
     if (!order) return res.status(404).json({ message: "Order not found." })
 
@@ -262,16 +261,16 @@ const updateOrder = async (req, res) => {
       const { item, itemModel, quantity, totalPrice, notes } = updatedItem
 
       if (
-        !item ||
-        !itemModel ||
-        quantity === undefined ||
-        totalPrice === undefined
+        itemModel &&
+        (itemModel === "Jewelry" || itemModel === "Collection") &&
+        (quantity === undefined || totalPrice === undefined)
       ) {
         return res.status(400).json({
           message:
             "Each item must include item ID, itemModel, quantity, and totalPrice.",
         })
       }
+      if(!itemModel) break
 
       let itemDoc
 
@@ -338,12 +337,7 @@ const updateOrder = async (req, res) => {
 
     for (const serviceItem of updatedServicesFromClient) {
       const { _id, service, jewelry, totalPrice, notes } = serviceItem
-
-      if (
-        !service ||
-        !Array.isArray(jewelry) ||
-        totalPrice === undefined
-      ) {
+      if (!service || totalPrice === undefined) {
         return res.status(400).json({
           message:
             "Each service must include service ID, jewelry items, and totalPrice.",
