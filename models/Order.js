@@ -19,16 +19,16 @@ const OrderSchema = new Schema(
         jewelry: [
           {
             name: { type: String },
-            images: [{ type: String }],
+            material: { type: String },
+            type: { type: String },
+            details: { type: String },
+            
           },
         ],
 
         totalPrice: {
           type: Number,
           required: true,
-        },
-        notes: {
-          type: String,
         },
       },
     ],
@@ -54,9 +54,7 @@ const OrderSchema = new Schema(
           type: Number,
           required: true,
         },
-        notes: {
-          type: String,
-        },
+
       },
     ],
     totalPrice: {
@@ -98,7 +96,6 @@ const OrderSchema = new Schema(
     address: {
       type: Schema.Types.ObjectId,
       ref: "Address",
-      // required: true,
     },
     notes: {
       type: String,

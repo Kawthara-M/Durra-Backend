@@ -230,7 +230,9 @@ const updateOrder = async (req, res) => {
     const {
       jewelryOrder: updatedItemsFromClient = [],
       serviceOrder: updatedServicesFromClient = [],
+      notes
     } = req.body
+
     if (
       (!Array.isArray(updatedItemsFromClient) ||
         updatedItemsFromClient.length === 0) &&
@@ -258,7 +260,7 @@ const updateOrder = async (req, res) => {
     let updatedItems = [...order.jewelryOrder]
 
     for (const updatedItem of updatedItemsFromClient) {
-      const { item, itemModel, quantity, totalPrice, notes } = updatedItem
+      const { item, itemModel, quantity, totalPrice } = updatedItem
 
       if (
         itemModel &&
@@ -270,7 +272,7 @@ const updateOrder = async (req, res) => {
             "Each item must include item ID, itemModel, quantity, and totalPrice.",
         })
       }
-      if(!itemModel) break
+      if (!itemModel) break
 
       let itemDoc
 
@@ -320,7 +322,6 @@ const updateOrder = async (req, res) => {
         } else {
           updatedItems[existingIndex].quantity = quantity
           updatedItems[existingIndex].totalPrice = totalPrice
-          updatedItems[existingIndex].notes = notes || ""
         }
       } else {
         updatedItems.push({
@@ -328,15 +329,14 @@ const updateOrder = async (req, res) => {
           itemModel,
           quantity,
           totalPrice,
-          notes: notes || "",
         })
       }
     }
-
     let updatedServices = []
 
     for (const serviceItem of updatedServicesFromClient) {
-      const { _id, service, jewelry, totalPrice, notes } = serviceItem
+      const { _id, service, jewelry, totalPrice } = serviceItem
+
       if (!service || totalPrice === undefined) {
         return res.status(400).json({
           message:
@@ -360,9 +360,8 @@ const updateOrder = async (req, res) => {
       updatedServices.push({
         _id,
         service,
-        jewelry,
+        jewelry: jewelry,
         totalPrice,
-        notes: notes || "",
       })
     }
 
@@ -378,6 +377,7 @@ const updateOrder = async (req, res) => {
     order.jewelryOrder = updatedItems
     order.serviceOrder = updatedServices
     order.totalPrice = totalJewelryPrice + totalServicePrice
+    order.notes = notes
 
     await order.save()
 
