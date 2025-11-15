@@ -230,7 +230,7 @@ const updateOrder = async (req, res) => {
     const {
       jewelryOrder: updatedItemsFromClient = [],
       serviceOrder: updatedServicesFromClient = [],
-      notes
+      notes,
     } = req.body
 
     if (
@@ -336,7 +336,6 @@ const updateOrder = async (req, res) => {
 
     for (const serviceItem of updatedServicesFromClient) {
       const { _id, service, jewelry, totalPrice } = serviceItem
-
       if (!service || totalPrice === undefined) {
         return res.status(400).json({
           message:
@@ -426,6 +425,7 @@ const updateOrderStatus = async (req, res) => {
     const statusTransitions = {
       Customer: {
         pending: ["submitted"],
+        submitted: ["pending"], 
       },
       Jeweler: {
         submitted: ["accepted", "rejected"],
