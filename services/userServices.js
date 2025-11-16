@@ -45,18 +45,7 @@ async function createUser({
     passwordDigest,
   })
 
-  // lets set address here for businesses, either using the entire address as their address name, or if we were able to use googlemaps they should specify it after login
 
-  /* 
-    const newAddress = await Address.create({
-    user: user._id,
-    name: address
-  })
-
-  // 3. Update the user with defaultAddress and addresses
-  user.defaultAddress = newAddress._id
-  user.addresses = [newAddress._id]
-  await user.save() */
   return user
 }
 

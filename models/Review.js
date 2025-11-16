@@ -16,11 +16,11 @@ const ReviewSchema = new Schema(
     reviewedItemType: {
       type: String,
       required: true,
-      enum: ["Service", "Jewelry"], // should we add collection?
+      enum: ["Service", "Jewelry", "Collection"], // should we add collection?
     },
     comment: {
       type: String,
-      required,
+      required:true,
     },
   },
   { timestamps: true }

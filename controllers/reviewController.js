@@ -1,15 +1,17 @@
 const Review = require("../models/Review")
 const Service = require("../models/Service")
 const Jewelry = require("../models/Jewelry")
+const Collection = require("../models/Collection")
+const Order = require("../models/Order")
 
 // not tested
 const getReviews = async (req, res) => {
   try {
     const { reviewedItemType, reviewedItemId } = req.params
 
-    if (!["Service", "Jewelry"].includes(reviewedItemType)) {
+    if (!["Service", "Jewelry", "Collection"].includes(reviewedItemType)) {
       return res.status(400).json({
-        error: "Invalid Type. Must be 'Service' or 'Jewelry'.",
+        error: "Invalid Type. Must be 'Service', 'Jewelry', or a 'Collection'.",
       })
     }
 
@@ -18,10 +20,11 @@ const getReviews = async (req, res) => {
       item = await Service.findById(reviewedItemId)
     } else if (reviewedItemType === "Jewelry") {
       item = await Jewelry.findById(reviewedItemId)
+    } else if (reviewedItemType === "Collection") {
+      item = await Collection.findById(reviewedItemId)
     }
 
     if (!item) {
-      console.log("here")
       return res.status(404).json({ error: `${reviewedItemType} not found.` })
     }
 
@@ -37,6 +40,64 @@ const getReviews = async (req, res) => {
   }
 }
 
+const canUserReview = async (req, res) => {
+  try {
+    const userId = res.locals.payload.id
+    const { reviewedItemType, reviewedItemId } = req.params
+
+    if (!["Service", "Jewelry", "Collection"].includes(reviewedItemType)) {
+      return res.status(400).json({
+        error: "Invalid Type. Must be 'Service', 'Jewelry' or 'Collection'.",
+      })
+    }
+
+    let item
+    if (reviewedItemType === "Service") {
+      item = await Service.findById(reviewedItemId)
+    } else if (reviewedItemType === "Jewelry") {
+      item = await Jewelry.findById(reviewedItemId)
+    } else if (reviewedItemType === "Collection") {
+      item = await Collection.findById(reviewedItemId)
+    }
+
+    if (!item) {
+      return res.status(404).json({ error: `${reviewedItemType} not found.` })
+    }
+
+    const validStatuses = ["delivered", "pickup"]
+    let hasOrdered = false
+
+    if (reviewedItemType === "Service") {
+      hasOrdered = await Order.exists({
+        user: userId,
+        status: { $in: validStatuses },
+        "serviceOrder.service": reviewedItemId,
+      })
+    } else if (reviewedItemType === "Jewelry") {
+      hasOrdered = await Order.exists({
+        user: userId,
+        status: { $in: validStatuses },
+        "jewelryOrder.item": reviewedItemId,
+        "jewelryOrder.itemModel": "Jewelry",
+      })
+    } else if (reviewedItemType === "Collection") {
+      hasOrdered = await Order.exists({
+        user: userId,
+        status: { $in: validStatuses },
+        "jewelryOrder.item": reviewedItemId,
+        "jewelryOrder.itemModel": "Collection",
+      })
+    }
+
+    return res.status(200).json({ canReview: !!hasOrdered })
+  } catch (error) {
+    console.error("Error checking review eligibility:", error)
+    return res
+      .status(500)
+      .json({ error: "Failed to check review eligibility." })
+  }
+}
+
 // not tested
 const createReview = async (req, res) => {
   try {
@@ -47,7 +108,7 @@ const createReview = async (req, res) => {
       return res.status(400).json({ error: "Comment is required." })
     }
 
-    if (!["Service", "Jewelry"].includes(reviewedItemType)) {
+    if (!["Service", "Jewelry", "Collection"].includes(reviewedItemType)) {
       return res.status(400).json({ error: "Invalid Type." })
     }
 
@@ -56,15 +117,15 @@ const createReview = async (req, res) => {
       item = await Service.findById(reviewedItem)
     } else if (reviewedItemType === "Jewelry") {
       item = await Jewelry.findById(reviewedItem)
+    } else if (reviewedItemType === "Collection") {
+      item = await Collection.findById(reviewedItem)
     }
 
     if (!item) {
       return res.status(404).json({ error: `${reviewedItemType} not found.` })
     }
 
-    // check if user is has ordered this jewelry/service
     const validStatuses = ["delivered", "pickup"]
-
     let hasOrdered = false
 
     if (reviewedItemType === "Service") {
@@ -77,13 +138,21 @@ const createReview = async (req, res) => {
       hasOrdered = await Order.exists({
         user: userId,
         status: { $in: validStatuses },
-        "jewelryOrder.jewelry": reviewedItem,
+        "jewelryOrder.item": reviewedItem,
+        "jewelryOrder.itemModel": "Jewelry",
+      })
+    } else if (reviewedItemType === "Collection") {
+      hasOrdered = await Order.exists({
+        user: userId,
+        status: { $in: validStatuses },
+        "jewelryOrder.item": reviewedItem,
+        "jewelryOrder.itemModel": "Collection",
       })
     }
 
     if (!hasOrdered) {
       return res.status(403).json({
-        error: `You must order this ${reviewedItemType.toLowerCase()} before reviewing.`,
+        error: `You must order this item before reviewing it.`,
       })
     }
 
@@ -172,4 +241,5 @@ module.exports = {
   createReview,
   updateReview,
   deleteReview,
+  canUserReview,
 }

@@ -227,177 +227,175 @@ const updateOrder = async (req, res) => {
   try {
     const userId = res.locals.payload.id
     const { orderId } = req.params
-    const {
-      jewelryOrder: updatedItemsFromClient = [],
-      serviceOrder: updatedServicesFromClient = [],
-      notes,
-    } = req.body
 
-    if (
-      (!Array.isArray(updatedItemsFromClient) ||
-        updatedItemsFromClient.length === 0) &&
-      (!Array.isArray(updatedServicesFromClient) ||
-        updatedServicesFromClient.length === 0)
-    ) {
+    const hasJewelryOrder = Object.prototype.hasOwnProperty.call(
+      req.body,
+      "jewelryOrder"
+    )
+    const hasServiceOrder = Object.prototype.hasOwnProperty.call(
+      req.body,
+      "serviceOrder"
+    )
+
+    const updatedItemsFromClient = hasJewelryOrder
+      ? req.body.jewelryOrder
+      : undefined
+    const updatedServicesFromClient = hasServiceOrder
+      ? req.body.serviceOrder
+      : undefined
+    const { notes } = req.body
+
+    if (!hasJewelryOrder && !hasServiceOrder) {
       return res.status(400).json({ message: "No valid order data provided." })
     }
 
     const order = await Order.findById(orderId)
     if (!order) return res.status(404).json({ message: "Order not found." })
-
-    if (order.user.toString() !== userId) {
+    if (order.user.toString() !== userId)
       return res
         .status(403)
         .json({ message: "Unauthorized to update this order." })
-    }
-
-    if (order.status !== "pending") {
+    if (order.status !== "pending")
       return res
         .status(400)
         .json({ message: "Only pending orders can be updated." })
+
+    let updatedItems = order.jewelryOrder 
+
+    if (hasJewelryOrder) {
+      updatedItems = []
+
+      for (const updatedItem of updatedItemsFromClient || []) {
+        const { item, itemModel, quantity, totalPrice } = updatedItem
+        if (!itemModel) continue
+
+        if (
+          (itemModel === "Jewelry" || itemModel === "Collection") &&
+          (quantity === undefined || totalPrice === undefined)
+        ) {
+          return res.status(400).json({
+            message:
+              "Each item must include item ID, itemModel, quantity, and totalPrice.",
+          })
+        }
+
+        if (quantity === 0) continue
+
+        let doc
+        if (itemModel === "Jewelry") doc = await Jewelry.findById(item)
+        if (itemModel === "Collection") doc = await Collection.findById(item)
+        if (!doc)
+          return res
+            .status(404)
+            .json({ message: `${itemModel} not found: ${item}` })
+        if (quantity > doc.limitPerOrder)
+          return res.status(400).json({
+            message: `Quantity exceeds limit for '${doc.name}'.`,
+          })
+        if (doc.shop.toString() !== order.shop.toString())
+          return res.status(400).json({
+            message: "Item does not belong to the same shop as the order.",
+          })
+
+        updatedItems.push({ item, itemModel, quantity, totalPrice })
+      }
+
+      order.jewelryOrder = updatedItems
     }
 
-    let updatedItems = [...order.jewelryOrder]
+    let updatedServices = order.serviceOrder
 
-    for (const updatedItem of updatedItemsFromClient) {
-      const { item, itemModel, quantity, totalPrice } = updatedItem
+    if (hasServiceOrder) {
+      updatedServices = []
 
-      if (
-        itemModel &&
-        (itemModel === "Jewelry" || itemModel === "Collection") &&
-        (quantity === undefined || totalPrice === undefined)
-      ) {
-        return res.status(400).json({
-          message:
-            "Each item must include item ID, itemModel, quantity, and totalPrice.",
-        })
-      }
-      if (!itemModel) break
-
-      let itemDoc
-
-      if (itemModel === "Jewelry") {
-        itemDoc = await Jewelry.findById(item)
-        if (!itemDoc) {
+      for (const serviceItem of updatedServicesFromClient || []) {
+        const { _id, service, jewelry = [], totalPrice } = serviceItem
+        if (!service)
           return res
             .status(400)
-            .json({ message: `Jewelry item not found: ${item}` })
-        }
+            .json({ message: "Each service must include service ID." })
 
-        if (quantity > itemDoc.limitPerOrder) {
-          return res.status(400).json({
-            message: `Quantity for jewelry '${itemDoc.name}' exceeds limit (${itemDoc.limitPerOrder}).`,
-          })
-        }
-      }
-
-      if (itemModel === "Collection") {
-        itemDoc = await Collection.findById(item)
-        if (!itemDoc) {
+        const serviceDoc = await Service.findById(service)
+        if (!serviceDoc)
           return res
-            .status(400)
-            .json({ message: `Collection not found: ${item}` })
-        }
-
-        if (quantity > itemDoc.limitPerOrder) {
+            .status(404)
+            .json({ message: `Service not found: ${service}` })
+        if (jewelry.length > serviceDoc.limitPerOrder)
           return res.status(400).json({
-            message: `Quantity for collection '${itemDoc.name}' exceeds limit (${itemDoc.limitPerOrder}).`,
+            message: `Too many jewelry items for service '${serviceDoc.name}'. Limit is ${serviceDoc.limitPerOrder}.`,
           })
-        }
-      }
 
-      if (itemDoc.shop.toString() !== order.shop.toString()) {
-        return res.status(400).json({
-          message: "Item does not belong to the same shop as the order.",
-        })
-      }
+        const jewelryObjects = jewelry.map((jItem) => ({
+          name: jItem.name || "",
+          material: jItem.material || "",
+          type: jItem.type || "",
+          details: jItem.details || "",
+        }))
 
-      const existingIndex = updatedItems.findIndex(
-        (i) => i.item.toString() === item && i.itemModel === itemModel
-      )
-
-      if (existingIndex !== -1) {
-        if (quantity === 0) {
-          updatedItems.splice(existingIndex, 1)
-        } else {
-          updatedItems[existingIndex].quantity = quantity
-          updatedItems[existingIndex].totalPrice = totalPrice
-        }
-      } else {
-        updatedItems.push({
-          item,
-          itemModel,
-          quantity,
+        updatedServices.push({
+          _id,
+          service,
+          jewelry: jewelryObjects,
           totalPrice,
         })
       }
-    }
-    let updatedServices = []
 
-    for (const serviceItem of updatedServicesFromClient) {
-      const { _id, service, jewelry, totalPrice } = serviceItem
-      if (!service || totalPrice === undefined) {
-        return res.status(400).json({
-          message:
-            "Each service must include service ID, jewelry items, and totalPrice.",
-        })
-      }
-
-      const serviceDoc = await Service.findById(service)
-      if (!serviceDoc) {
-        return res
-          .status(400)
-          .json({ message: `Service not found: ${service}` })
-      }
-
-      if (jewelry.length > serviceDoc.limitPerOrder) {
-        return res.status(400).json({
-          message: `Too many jewelry items for service '${serviceDoc.name}'. Limit is ${serviceDoc.limitPerOrder}.`,
-        })
-      }
-
-      updatedServices.push({
-        _id,
-        service,
-        jewelry: jewelry,
-        totalPrice,
-      })
+      order.serviceOrder = updatedServices
     }
 
-    const totalJewelryPrice = updatedItems.reduce(
-      (sum, item) => sum + item.totalPrice,
-      0
-    )
-    const totalServicePrice = updatedServices.reduce(
-      (sum, item) => sum + item.totalPrice,
-      0
-    )
+    const finalJewelry = hasJewelryOrder ? updatedItems : order.jewelryOrder
+    const finalServices = hasServiceOrder ? updatedServices : order.serviceOrder
 
-    order.jewelryOrder = updatedItems
-    order.serviceOrder = updatedServices
-    order.totalPrice = totalJewelryPrice + totalServicePrice
-    order.notes = notes
+    order.totalPrice =
+      finalJewelry.reduce((sum, i) => sum + (i.totalPrice || 0), 0) +
+      finalServices.reduce((sum, s) => sum + (s.totalPrice || 0), 0)
+
+    order.notes = notes || order.notes || ""
 
     await order.save()
 
     const populatedOrder = await Order.findById(order._id)
       .populate("user")
-      .populate({
-        path: "jewelryOrder.item",
-      })
-      .populate({
-        path: "serviceOrder.service",
-      })
+      .populate({ path: "jewelryOrder.item" })
+      .populate({ path: "serviceOrder.service" })
       .populate("shop")
 
-    res.status(200).json({
-      message: "Order updated successfully.",
-      order: populatedOrder,
-    })
+    res
+      .status(200)
+      .json({ message: "Order updated successfully.", order: populatedOrder })
   } catch (error) {
     console.error("Error updating order:", error)
     res.status(500).json({ message: "Failed to update order" })
   }
+}
+
+// not tested yet
+const activeTimers = new Map()
+
+const startJewelerTimeout = (orderId, minutes = 5) => {
+  if (activeTimers.has(orderId)) {
+    clearTimeout(activeTimers.get(orderId))
+  }
+
+  const timer = setTimeout(async () => {
+    try {
+      const order = await Order.findById(orderId)
+
+      if (order && order.status === "submitted") {
+        order.status = "pending"
+        await order.save()
+        console.log(
+          ` Order ${orderId} reverted back to pending (jeweler timeout).`
+        )
+      }
+    } catch (err) {
+      console.error("Timeout revert failed:", err)
+    } finally {
+      activeTimers.delete(orderId)
+    }
+  }, minutes * 60 * 1000)
+
+  activeTimers.set(orderId, timer)
 }
 
 // tested until processing
@@ -415,7 +413,8 @@ const updateOrderStatus = async (req, res) => {
     }
 
     const order = await Order.findById(orderId)
-
+    console.log("order.user", order.user.toString())
+    console.log("payload.id", res.locals.payload.id)
     if (!order) {
       return res.status(404).json({ message: "Order not found." })
     }
@@ -425,7 +424,7 @@ const updateOrderStatus = async (req, res) => {
     const statusTransitions = {
       Customer: {
         pending: ["submitted"],
-        submitted: ["pending"], 
+        submitted: ["pending"],
       },
       Jeweler: {
         submitted: ["accepted", "rejected"],
@@ -473,6 +472,10 @@ const updateOrderStatus = async (req, res) => {
     order.status = newStatus
 
     await order.save()
+
+    if (newStatus === "submitted") {
+      startJewelerTimeout(orderId, 5)
+    }
 
     // not tested
     if (newStatus === "ready" && order.collectionMethod === "delivery") {

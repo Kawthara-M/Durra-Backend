@@ -8,6 +8,12 @@ router.get(
   middleware.verifyToken,
   reviewRouter.getReviews
 )
+router.get(
+  "/can-review/:type/:id",
+  middleware.stripToken,
+  middleware.verifyToken,
+  reviewRouter.canUserReview
+)
 
 router.post(
   "/",
