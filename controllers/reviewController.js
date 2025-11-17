@@ -4,7 +4,7 @@ const Jewelry = require("../models/Jewelry")
 const Collection = require("../models/Collection")
 const Order = require("../models/Order")
 
-// not tested
+// tested from frontend
 const getReviews = async (req, res) => {
   try {
     const { reviewedItemType, reviewedItemId } = req.params
@@ -40,11 +40,11 @@ const getReviews = async (req, res) => {
   }
 }
 
+// tested from frontend
 const canUserReview = async (req, res) => {
   try {
     const userId = res.locals.payload.id
     const { reviewedItemType, reviewedItemId } = req.params
-
     if (!["Service", "Jewelry", "Collection"].includes(reviewedItemType)) {
       return res.status(400).json({
         error: "Invalid Type. Must be 'Service', 'Jewelry' or 'Collection'.",
@@ -64,7 +64,7 @@ const canUserReview = async (req, res) => {
       return res.status(404).json({ error: `${reviewedItemType} not found.` })
     }
 
-    const validStatuses = ["delivered", "pickup"]
+    const validStatuses = ["delivered", "picked-up"]
     let hasOrdered = false
 
     if (reviewedItemType === "Service") {
@@ -98,7 +98,7 @@ const canUserReview = async (req, res) => {
   }
 }
 
-// not tested
+// tested from frontend
 const createReview = async (req, res) => {
   try {
     const userId = res.locals.payload.id
@@ -125,7 +125,7 @@ const createReview = async (req, res) => {
       return res.status(404).json({ error: `${reviewedItemType} not found.` })
     }
 
-    const validStatuses = ["delivered", "pickup"]
+    const validStatuses = ["delivered", "picked-up"]
     let hasOrdered = false
 
     if (reviewedItemType === "Service") {
@@ -162,17 +162,22 @@ const createReview = async (req, res) => {
       reviewedItemType,
       comment,
     })
+    const populatedReview = await Review.findById(newReview._id).populate(
+      "user",
+      "fName lName email"
+    )
 
-    res
-      .status(201)
-      .json({ message: "Review created successfully.", review: newReview })
+    res.status(201).json({
+      message: "Review created successfully.",
+      review: populatedReview,
+    })
   } catch (error) {
     console.error("Error creating review:", error)
     res.status(500).json({ error: "Failed to create review." })
   }
 }
 
-// not tested
+// tested from frontend
 const updateReview = async (req, res) => {
   try {
     const userId = res.locals.payload.id
@@ -197,7 +202,15 @@ const updateReview = async (req, res) => {
     review.comment = comment
     await review.save()
 
-    res.status(200).json({ message: "Review updated successfully.", review })
+    const populatedReview = await Review.findById(review._id).populate(
+      "user",
+      "fName lName email"
+    )
+
+    res.status(200).json({
+      message: "Review updated successfully.",
+      review: populatedReview,
+    })
   } catch (error) {
     console.error("Error updating review:", error)
     res.status(500).json({ error: "Failed to update review." })

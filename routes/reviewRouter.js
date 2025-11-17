@@ -9,7 +9,7 @@ router.get(
   reviewRouter.getReviews
 )
 router.get(
-  "/can-review/:type/:id",
+  "/can-review/:reviewedItemType/:reviewedItemId",
   middleware.stripToken,
   middleware.verifyToken,
   reviewRouter.canUserReview
