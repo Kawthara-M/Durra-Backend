@@ -1,7 +1,6 @@
 const router = require("express").Router()
 const requestCtrl = require("../controllers/requestController")
 const middleware = require("../middleware")
-const upload = require("../middleware/multer")
 
 router.get(
   "/",

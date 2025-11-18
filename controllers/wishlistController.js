@@ -29,13 +29,11 @@ const createWishlist = async (req, res) => {
     const userId = res.locals.payload.id
     const { items, favouritedItem, favouritedItemType } = req.body
 
-    // Support both { items: [...] } and single item creation
     const entries =
       items && Array.isArray(items)
         ? items
         : [{ favouritedItem, favouritedItemType }]
 
-    // Validate all entries
     for (const entry of entries) {
       if (
         !["Service", "Jewelry", "Collection"].includes(entry.favouritedItemType)
@@ -46,7 +44,6 @@ const createWishlist = async (req, res) => {
       }
     }
 
-    // Optionally validate that all items exist
     for (const entry of entries) {
       let itemModel
       if (entry.favouritedItemType === "Service") itemModel = Service
@@ -61,7 +58,6 @@ const createWishlist = async (req, res) => {
       }
     }
 
-    // Create wishlist
     const newWishlist = await Wishlist.create({
       user: userId,
       items: entries.map((e) => ({
