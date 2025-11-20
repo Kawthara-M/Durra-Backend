@@ -82,7 +82,9 @@ const updateRequest = async (req, res) => {
       // should test
       if (status === "approved") {
         const parsedDetails =
-          typeof request.details === "string" ? JSON.parse(request.details) : request.details
+          typeof request.details === "string"
+            ? JSON.parse(request.details)
+            : request.details
         const { email, name, cr, description } = parsedDetails
 
         const user = await User.findById(request.user)
@@ -97,7 +99,6 @@ const updateRequest = async (req, res) => {
           .update(resetToken)
           .digest("hex")
 
-        // Store token and expiry
         user.passwordResetToken = hashedToken
         user.passwordResetExpires = Date.now() + 24 * 60 * 60 * 1000
         await user.save()
@@ -109,12 +110,46 @@ const updateRequest = async (req, res) => {
           description: description || "",
         })
 
-        const resetLink = `http://localhost:5173/set-password?token=${resetToken}`
-        // uncomment later so we dont spam
+        const activationUrl = `http://localhost:5173/set-password?token=${resetToken}`
+
         await sendEmail({
           to: email,
           subject: "Durra Account Activation",
-          text: `Greetings ${name},\n\nThanks for signing up as a jeweler. You have been assigned access to Durra platform, use this link ${resetLink} to set your password.\nThis link will expire in 24 hours. If you do not activate your account in time, please contact support to resend the invitation.\n\n- Durra Team`,
+          html: `
+  <div style="font-family:Arial, sans-serif; background:#f7f7f7; padding:2em; color:#333;">
+    <div style="max-width:90%; margin:auto; background:#ffffff; padding:2.2em; border-radius:0.5em; border:0.07em solid #e8e8e8;">
+
+      <h2 style="color:#000; font-size:1.5em; margin-bottom:1em;">Activate Your Durra Account</h2>
+
+      <p style="font-size:1em; line-height:1.6;">
+        Greetings ${name || user.fName || user.name || "Valued Jeweler"},
+      </p>
+
+      <p style="font-size:1em; line-height:1.6; margin-bottom:1.5em;">
+        Thank you for signing up as a jeweler. Your request has been approved and you have been granted access to the Durra platform.
+        Click the button below to set your password and activate your account.
+      </p>
+
+      <a href="${activationUrl}" style="
+        display:inline-block;
+        background:#6f0101;
+        color:#fff;
+        padding:0.8em 1.4em;
+        text-decoration:none;
+        font-weight:bold;
+        border-radius:0.4em;
+      ">Set Password</a>
+
+      <p style="font-size:0.9em; color:#777; margin-top:2em;">
+        This link will expire in 24 hours. If it expires before you activate your account, please contact support to resend the invitation.
+      </p>
+
+      <div style="margin-top:2.5em; text-align:center;">
+        DURRA
+      </div>
+    </div>
+  </div>
+      `,
         })
 
         return res.status(201).json({
@@ -132,12 +167,45 @@ const updateRequest = async (req, res) => {
 
         await sendEmail({
           to: user.email,
-          subject: "Durra Account",
-          text: `Greetings ${
-            user.name
-          },\n\nThanks for signing up as a jeweler, unfortunately your request have been declined.${
-            adminNote ? adminNote : null
-          }\n\n- Durra Team`,
+          subject: "Durra Account Request Update",
+          html: `
+  <div style="font-family:Arial, sans-serif; background:#f7f7f7; padding:2em; color:#333;">
+    <div style="max-width:90%; margin:auto; background:#ffffff; padding:2.2em; border-radius:0.5em; border:0.07em solid #e8e8e8;">
+
+      <h2 style="color:#000; font-size:1.5em; margin-bottom:1em;">Account Request Declined</h2>
+
+      <p style="font-size:1em; line-height:1.6;">
+        Greetings ${user.name || "Applicant"},
+      </p>
+
+      <p style="font-size:1em; line-height:1.6; margin-bottom:1.5em;">
+        Thank you for your interest in joining the Durra platform as a jeweler.
+        After reviewing your request, it is regret to inform you that it has been declined at this time.
+      </p>
+
+      ${
+        adminNote
+          ? `
+      <div style="margin:1.5em 0; padding:1em; background:#f9f1f1; border-left:0.25em solid #6f0101;">
+        <p style="font-size:0.95em; margin:0;">
+          <strong>Admin Note:</strong><br/>
+          ${adminNote}
+        </p>
+      </div>
+      `
+          : ""
+      }
+
+      <p style="font-size:0.95em; line-height:1.6; color:#555;">
+        If you believe this was a mistake or would like to provide additional information, please contact Durra support for further assistance.
+      </p>
+
+      <div style="margin-top:2.5em; text-align:center; ont-family:'Playfair Display','Times New Roman'">
+        DURRA
+      </div>
+    </div>
+  </div>
+      `,
         })
 
         await User.findByIdAndDelete(user._id)
