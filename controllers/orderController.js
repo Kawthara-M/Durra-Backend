@@ -7,7 +7,25 @@ const Service = require("../models/Service")
 const Shipment = require("../models/Shipment")
 const Driver = require("../models/Driver")
 
-// tested while logged in as jeweler, test again I added service
+const orderPopulateConfig = [
+  {
+    path: "jewelryOrder.item",
+    strictPopulate: false, // because of refPath
+    populate: {
+      path: "jewelry", // this exists only on Collection
+      model: "Jewelry",
+      strictPopulate: false,
+    },
+  },
+  {
+    path: "serviceOrder.service",
+    strictPopulate: false,
+  },
+  { path: "shop", strictPopulate: false },
+  { path: "user", strictPopulate: false },
+]
+
+// test again
 const getAllOrders = async (req, res) => {
   try {
     const userId = res.locals.payload.id
@@ -16,25 +34,13 @@ const getAllOrders = async (req, res) => {
     let orders = []
 
     if (role === "Customer") {
-      orders = await Order.find({ user: userId })
-        .populate("user")
-        .populate({
-          path: "jewelryOrder.item",
-        })
-        .populate({
-          path: "serviceOrder",
-          populate: {
-            path: "service",
-          },
-        })
-        .populate("shop")
+      orders = await Order.find({ user: userId }).populate(orderPopulateConfig)
     } else if (role === "Jeweler") {
       const shop = await Shop.findOne({ user: userId })
       if (!shop) {
         return res.status(404).json({ error: "Shop not found." })
       }
 
-      // to ensure jewelers dont see orders in pending and cancelled states
       orders = await Order.find({
         shop: shop._id,
         status: { $nin: ["pending", "cancelled"] },
@@ -70,22 +76,43 @@ const getAllOrders = async (req, res) => {
   }
 }
 
-// tested, test again I added service
-const getOrder = async (req, res) => {
+const getPendingOrder = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.orderId)
-      .populate("user")
-      .populate("shop")
+    const userId = res.locals.payload.id
+
+    const order = await Order.findOne({
+      user: userId,
+      status: "pending",
+    })
       .populate({
         path: "jewelryOrder.item",
-      })
-
-      .populate({
-        path: "serviceOrder",
+        strictPopulate: false, // because of refPath (Jewelry | Collection)
         populate: {
-          path: "service",
+          path: "jewelry", // only exists on Collection
+          model: "Jewelry",
+          strictPopulate: false,
         },
       })
+      .populate({
+        path: "serviceOrder.service",
+        strictPopulate: false,
+      })
+      .populate("shop")
+      .populate("user")
+
+    return res.status(200).json(order || null)
+  } catch (err) {
+    console.error("Error fetching order:", err)
+    return res.status(500).json({ message: "Failed to fetch pending order" })
+  }
+}
+
+// tested,
+const getOrder = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.orderId).populate(
+      orderPopulateConfig
+    )
 
     const userId = res.locals.payload.id
     const userRole = res.locals.payload.role
@@ -93,11 +120,11 @@ const getOrder = async (req, res) => {
     if (!order) {
       return res.status(404).json({ error: "Order not found." })
     }
-
+    console.log(order.user)
     if (
       userRole !== "Admin" &&
       userRole !== "Jeweler" &&
-      order.user.toString() !== userId
+      order.user._id.toString() !== userId
     ) {
       return res.status(403).json({ error: "Unauthorized to view this Order." })
     }
@@ -111,7 +138,7 @@ const getOrder = async (req, res) => {
   }
 }
 
-// tested: using insomnia
+// tested
 const createOrder = async (req, res) => {
   try {
     const userId = res.locals.payload.id
@@ -137,7 +164,6 @@ const createOrder = async (req, res) => {
     }
 
     let shopId
-
     if (jewelryOrder.length > 0) {
       for (const orderItem of jewelryOrder) {
         const { item, itemModel, quantity } = orderItem
@@ -207,6 +233,7 @@ const createOrder = async (req, res) => {
       totalPrice,
       collectionMethod,
       status: "pending",
+      notes: "",
       address,
     })
 
@@ -228,58 +255,37 @@ const updateOrder = async (req, res) => {
     const userId = res.locals.payload.id
     const { orderId } = req.params
 
-    const hasJewelryOrder = Object.prototype.hasOwnProperty.call(
-      req.body,
-      "jewelryOrder"
-    )
-    const hasServiceOrder = Object.prototype.hasOwnProperty.call(
-      req.body,
-      "serviceOrder"
-    )
+    console.log(req.body)
 
-    const updatedItemsFromClient = hasJewelryOrder
-      ? req.body.jewelryOrder
-      : undefined
-    const updatedServicesFromClient = hasServiceOrder
-      ? req.body.serviceOrder
-      : undefined
-    const { notes } = req.body
+    const hasJewelryOrder = req.body.hasOwnProperty("jewelryOrder")
+    const hasServiceOrder = req.body.hasOwnProperty("serviceOrder")
+
+    const updatedJewelryFromClient = req.body.jewelryOrder || []
+    const updatedServicesFromClient = req.body.serviceOrder || []
+    const { notes, shop } = req.body
 
     if (!hasJewelryOrder && !hasServiceOrder) {
+      console.log("hh")
       return res.status(400).json({ message: "No valid order data provided." })
     }
 
     const order = await Order.findById(orderId)
     if (!order) return res.status(404).json({ message: "Order not found." })
+
     if (order.user.toString() !== userId)
-      return res
-        .status(403)
-        .json({ message: "Unauthorized to update this order." })
-    if (order.status !== "pending")
-      return res
-        .status(400)
-        .json({ message: "Only pending orders can be updated." })
-
-    let updatedItems = order.jewelryOrder 
-
+      return res.status(403).json({ message: "Unauthorized." })
+    // if (order.status !== "pending" && order.status !== "accepted")
+    //   return res
+    //     .status(400)
+    //     .json({ message: "Only pending orders can be updated." })
     if (hasJewelryOrder) {
-      updatedItems = []
+      const newJewelryOrder = []
 
-      for (const updatedItem of updatedItemsFromClient || []) {
-        const { item, itemModel, quantity, totalPrice } = updatedItem
+      for (const entry of updatedJewelryFromClient) {
+        const { item, itemModel, quantity, totalPrice, size } = entry
+
         if (!itemModel) continue
-
-        if (
-          (itemModel === "Jewelry" || itemModel === "Collection") &&
-          (quantity === undefined || totalPrice === undefined)
-        ) {
-          return res.status(400).json({
-            message:
-              "Each item must include item ID, itemModel, quantity, and totalPrice.",
-          })
-        }
-
-        if (quantity === 0) continue
+        if (!quantity || quantity <= 0) continue
 
         let doc
         if (itemModel === "Jewelry") doc = await Jewelry.findById(item)
@@ -288,51 +294,49 @@ const updateOrder = async (req, res) => {
           return res
             .status(404)
             .json({ message: `${itemModel} not found: ${item}` })
+
         if (quantity > doc.limitPerOrder)
           return res.status(400).json({
             message: `Quantity exceeds limit for '${doc.name}'.`,
           })
-        if (doc.shop.toString() !== order.shop.toString())
-          return res.status(400).json({
-            message: "Item does not belong to the same shop as the order.",
-          })
 
-        updatedItems.push({ item, itemModel, quantity, totalPrice })
+        newJewelryOrder.push({
+          item,
+          itemModel,
+          quantity,
+          totalPrice,
+          ...(size ? { size } : {}),
+        })
       }
 
-      order.jewelryOrder = updatedItems
+      order.jewelryOrder = newJewelryOrder
     }
 
-    let updatedServices = order.serviceOrder
-
     if (hasServiceOrder) {
-      updatedServices = []
+      const newServiceOrder = []
 
-      for (const serviceItem of updatedServicesFromClient || []) {
-        const { _id, service, jewelry = [], totalPrice } = serviceItem
-        if (!service)
-          return res
-            .status(400)
-            .json({ message: "Each service must include service ID." })
+      for (const s of updatedServicesFromClient) {
+        const { _id, service, jewelry = [], totalPrice } = s
 
         const serviceDoc = await Service.findById(service)
         if (!serviceDoc)
           return res
             .status(404)
             .json({ message: `Service not found: ${service}` })
+
         if (jewelry.length > serviceDoc.limitPerOrder)
           return res.status(400).json({
-            message: `Too many jewelry items for service '${serviceDoc.name}'. Limit is ${serviceDoc.limitPerOrder}.`,
+            message: `Too many jewelry items for service '${serviceDoc.name}'. Limit ${serviceDoc.limitPerOrder}.`,
           })
 
-        const jewelryObjects = jewelry.map((jItem) => ({
-          name: jItem.name || "",
-          material: jItem.material || "",
-          type: jItem.type || "",
-          details: jItem.details || "",
+        const jewelryObjects = jewelry.map((j) => ({
+          name: j.name || "",
+          material: j.material || "",
+          type: j.type || "",
+          details: j.details || "",
         }))
 
-        updatedServices.push({
+        newServiceOrder.push({
           _id,
           service,
           jewelry: jewelryObjects,
@@ -340,29 +344,31 @@ const updateOrder = async (req, res) => {
         })
       }
 
-      order.serviceOrder = updatedServices
+      order.serviceOrder = newServiceOrder
     }
 
-    const finalJewelry = hasJewelryOrder ? updatedItems : order.jewelryOrder
-    const finalServices = hasServiceOrder ? updatedServices : order.serviceOrder
+    if (shop) {
+      order.shop = shop
+    }
+    const finalJewelry = order.jewelryOrder
+    const finalServices = order.serviceOrder
 
     order.totalPrice =
       finalJewelry.reduce((sum, i) => sum + (i.totalPrice || 0), 0) +
       finalServices.reduce((sum, s) => sum + (s.totalPrice || 0), 0)
 
-    order.notes = notes || order.notes || ""
+    if (notes !== undefined) order.notes = notes
 
     await order.save()
 
-    const populatedOrder = await Order.findById(order._id)
-      .populate("user")
-      .populate({ path: "jewelryOrder.item" })
-      .populate({ path: "serviceOrder.service" })
-      .populate("shop")
+    const populatedOrder = await Order.findById(order._id).populate(
+      orderPopulateConfig
+    )
 
-    res
-      .status(200)
-      .json({ message: "Order updated successfully.", order: populatedOrder })
+    res.status(200).json({
+      message: "Order updated successfully",
+      order: populatedOrder,
+    })
   } catch (error) {
     console.error("Error updating order:", error)
     res.status(500).json({ message: "Failed to update order" })
@@ -372,7 +378,7 @@ const updateOrder = async (req, res) => {
 // not tested yet
 const activeTimers = new Map()
 
-const startJewelerTimeout = (orderId, minutes = 5) => {
+const startJewelerTimeout = (orderId, minutes = 2) => {
   if (activeTimers.has(orderId)) {
     clearTimeout(activeTimers.get(orderId))
   }
@@ -413,8 +419,6 @@ const updateOrderStatus = async (req, res) => {
     }
 
     const order = await Order.findById(orderId)
-    console.log("order.user", order.user.toString())
-    console.log("payload.id", res.locals.payload.id)
     if (!order) {
       return res.status(404).json({ message: "Order not found." })
     }
@@ -474,7 +478,7 @@ const updateOrderStatus = async (req, res) => {
     await order.save()
 
     if (newStatus === "submitted") {
-      startJewelerTimeout(orderId, 5)
+      startJewelerTimeout(orderId, 2)
     }
 
     // not tested
@@ -523,6 +527,74 @@ const updateOrderStatus = async (req, res) => {
   }
 }
 
+
+const payOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params
+    const { paymentMethod = "Card", amount } = req.body || {}
+    const order = await Order.findById(orderId)
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" })
+    }
+
+    if (String(order.user) !== String(res.locals.payload.id)) {
+      return res.status(403).json({ message: "Not allowed" })
+    }
+
+    if (order.status === "cancelled" || order.status === "pending") {
+      return res
+        .status(400)
+        .json({ message: "You cannot pay for this order at this stage." })
+    }
+
+    if (order.paymentStatus === "Paid") {
+      return res.status(400).json({ message: "Order already paid." })
+    }
+
+    // verification
+    // if (amount != null) {
+    //   const jewelrySubtotal = (order.jewelryOrder || []).reduce(
+    //     (sum, j) => sum + (j.totalPrice || 0),
+    //     0
+    //   )
+    //   const serviceSubtotal = (order.serviceOrder || []).reduce(
+    //     (sum, s) => sum + (s.totalPrice || 0),
+    //     0
+    //   )
+    //   const baseSubtotal = jewelrySubtotal + serviceSubtotal
+
+    //   const VAT_RATE = 0.1
+    //   const DELIVERY_FLAT_RATE = 2
+    //   const deliveryFee =
+    //     order.collectionMethod === "delivery" ? DELIVERY_FLAT_RATE : 0
+    //   const vatAmount = baseSubtotal * VAT_RATE
+    //   const expectedTotal = baseSubtotal + vatAmount + deliveryFee
+
+    //   const diff = Math.abs(Number(amount) - Number(expectedTotal))
+    //   if (diff > 0.005) {
+    //     return res.status(400).json({
+    //       message: "Payment amount mismatch.",
+    //       expectedTotal: expectedTotal.toFixed(3),
+    //     })
+    //   }
+    // }
+
+    order.paymentStatus = "Paid"
+    order.paymentMethod = paymentMethod
+
+    await order.save()
+
+    return res.json({
+      message: "Payment successful.",
+      order,
+    })
+  } catch (err) {
+    console.error("payForOrder error:", err)
+    return res.status(500).json({ message: "Server error processing payment." })
+  }
+}
+
 // tested
 const cancelOrder = async (req, res) => {
   try {
@@ -554,8 +626,10 @@ const cancelOrder = async (req, res) => {
 module.exports = {
   getAllOrders,
   getOrder,
+  getPendingOrder,
   createOrder,
   updateOrder,
   updateOrderStatus,
+  payOrder,
   cancelOrder,
 }

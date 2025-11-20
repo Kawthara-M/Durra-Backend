@@ -8,6 +8,12 @@ router.get(
   middleware.verifyToken,
   orderCtrl.getAllOrders
 )
+router.get(
+  "/pending",
+  middleware.stripToken,
+  middleware.verifyToken,
+  orderCtrl.getPendingOrder
+)
 
 router.get(
   "/:orderId",
@@ -29,6 +35,14 @@ router.put(
   middleware.verifyToken,
   middleware.isCustomer,
   orderCtrl.updateOrder
+)
+
+router.put(
+  "/:orderId/pay",
+  middleware.stripToken,
+  middleware.verifyToken,
+  middleware.isCustomer,
+  orderCtrl.payOrder
 )
 
 // for jewelers and deliverymen

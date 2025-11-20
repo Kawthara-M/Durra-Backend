@@ -22,7 +22,6 @@ const OrderSchema = new Schema(
             material: { type: String },
             type: { type: String },
             details: { type: String },
-            
           },
         ],
 
@@ -39,7 +38,7 @@ const OrderSchema = new Schema(
         item: {
           type: Schema.Types.ObjectId,
           required: true,
-          refPath: "jewelryOrder.itemModel", 
+          refPath: "jewelryOrder.itemModel",
         },
         itemModel: {
           type: String,
@@ -54,7 +53,9 @@ const OrderSchema = new Schema(
           type: Number,
           required: true,
         },
-
+        size: {
+          type: String, 
+        },
       },
     ],
     totalPrice: {
