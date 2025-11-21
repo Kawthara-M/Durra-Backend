@@ -7,7 +7,7 @@
 **Date:** x / x / 2025 
 
 ## 📌 Description
-**Durra** is the arabic pronunciation of pearl and things of value, and was chosen to intitle the web-based platform matching between jewelrs and jewelry seekers in Bahrain. All  guided by the vision of preserving Bahrain's jewelry heritage and culture. 
+**Durra** is the arabic pronunciation of pearl and things of value, and was chosen to intitle the web-based platform matching between jewelers and jewelry seekers in Bahrain. All  guided by the vision of preserving Bahrain's jewelry heritage and culture. 
 
 This repository is dedicated for Durra's backend, for more details do refer to [Main Repository](https://github.com/Kawthara-M/Durra).
 
