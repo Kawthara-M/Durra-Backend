@@ -63,6 +63,7 @@ const getAllOrders = async (req, res) => {
         .populate("jewelryOrder")
         .populate("serviceOrder")
         .populate("shop")
+        console.log(orders.length)
     } else if (role === "Driver") {
       orders = await Order.find().populate("user")
     } else {

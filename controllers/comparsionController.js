@@ -1,6 +1,19 @@
 const Comparsion = require("../models/Comparsion")
 const Jewelry = require("../models/Jewelry")
 
+
+// tested from frontend
+const getAllComparsions = async (req, res) => {
+  try {
+    const comparsions = await Comparsion.find()
+
+    res.status(200).json({ comparsions })
+  } catch (error) {
+    console.error("Error fetching comparsions:", error)
+    res.status(500).json({ error: "Failed to fetch comparsions." })
+  }
+}
+
 // tested from frontend
 const getComparsion = async (req, res) => {
   try {
@@ -66,7 +79,7 @@ const createComparsion = async (req, res) => {
 const updateComparsion = async (req, res) => {
   try {
     const userId = res.locals.payload.id
-    let { jewelry } = req.body 
+    let { jewelry } = req.body
 
     if (!Array.isArray(jewelry)) {
       return res.status(400).json({ error: "jewelry must be an array" })
@@ -92,6 +105,7 @@ const updateComparsion = async (req, res) => {
 }
 
 module.exports = {
+  getAllComparsions,
   getComparsion,
   createComparsion,
   updateComparsion,

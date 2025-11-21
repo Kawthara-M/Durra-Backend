@@ -9,6 +9,13 @@ router.get(
   middleware.isCustomer,
   comparsionCtrl.getComparsion
 )
+router.get(
+  "/all",
+  middleware.stripToken,
+  middleware.verifyToken,
+  middleware.isAdmin,
+  comparsionCtrl.getAllComparsions
+)
 
 router.post(
   "/",

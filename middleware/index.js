@@ -55,6 +55,7 @@ const verifyToken = (req, res, next) => {
 }
 
 const isAdmin = (req, res, next) => {
+  console.log(res.locals.payload)
   const user = res.locals.payload
   if (user && user.role === "Admin") {
     return next()

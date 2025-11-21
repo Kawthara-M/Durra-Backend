@@ -36,6 +36,7 @@ router.put(
   "/:requestId",
   middleware.stripToken,
   middleware.verifyToken,
+  middleware.isAdmin,
   requestCtrl.updateRequest
 )
 

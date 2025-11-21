@@ -26,6 +26,20 @@ const getUserProfile = async (req, res) => {
   }
 }
 
+const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find()
+
+    res.status(200).json({
+      users,
+    })
+  } catch (error) {
+    return res.status(500).json({
+      error: "Failure encountred while fetching users.",
+    })
+  }
+}
+
 // only for user data, data related to shop or deliveryman only should be in separate controller
 // tested! test again
 const updateUserProfile = async (req, res) => {
@@ -63,5 +77,6 @@ const updateUserProfile = async (req, res) => {
 
 module.exports = {
   getUserProfile,
+  getAllUsers,
   updateUserProfile,
 }

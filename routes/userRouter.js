@@ -9,6 +9,13 @@ router.get(
   middleware.verifyToken,
   userCtrl.getUserProfile
 )
+router.get(
+  '/users',
+  middleware.stripToken,
+  middleware.verifyToken,
+  middleware.isAdmin,
+  userCtrl.getAllUsers
+)
 
 router.put(
   '/',
