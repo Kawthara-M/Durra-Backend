@@ -8,9 +8,15 @@ const getWishlist = async (req, res) => {
   try {
     const userId = res.locals.payload.id
 
-    const wishlist = await Wishlist.findOne({ user: userId }).populate({
-      path: "items.favouritedItem",
-    })
+    const wishlist = await Wishlist.findOne({ user: userId })
+      .populate({
+        path: "items.favouritedItem",
+        populate: [
+          { path: "shop", select: "name" },
+          { path: "jewelry", strictPopulate: false },
+        ],
+      })
+      .setOptions({ strictPopulate: false })
 
     if (!wishlist) {
       return res.status(404).json({ error: `Wishlist not found.` })

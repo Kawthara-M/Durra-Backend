@@ -50,7 +50,7 @@ const createAddress = async (req, res) => {
     const {
       name,
       road,
-      building,
+      block,
       house,
       area,
       governante,
@@ -64,7 +64,7 @@ const createAddress = async (req, res) => {
       name,
       governante,
       area,
-      building,
+      block,
       road,
       house,
       coordinates,
@@ -91,7 +91,7 @@ const updateAddress = async (req, res) => {
     const {
       name,
       road,
-      building,
+      block,
       house,
       governante,
       area,
@@ -113,7 +113,7 @@ const updateAddress = async (req, res) => {
       {
         name,
         road,
-        building,
+        block,
         house,
         governante,
         area,

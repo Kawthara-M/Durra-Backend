@@ -63,7 +63,7 @@ const getAllOrders = async (req, res) => {
         .populate("jewelryOrder")
         .populate("serviceOrder")
         .populate("shop")
-        console.log(orders.length)
+      console.log(orders.length)
     } else if (role === "Driver") {
       orders = await Order.find().populate("user")
     } else {
@@ -121,7 +121,6 @@ const getOrder = async (req, res) => {
     if (!order) {
       return res.status(404).json({ error: "Order not found." })
     }
-    console.log(order.user)
     if (
       userRole !== "Admin" &&
       userRole !== "Jeweler" &&
@@ -251,128 +250,131 @@ const createOrder = async (req, res) => {
 }
 
 // tested: using insomnia
+const VAT_RATE = 0.1
+const DELIVERY_FLAT = 2
+
 const updateOrder = async (req, res) => {
   try {
     const userId = res.locals.payload.id
     const { orderId } = req.params
 
-    console.log(req.body)
+    const hasJewelryOrder = Object.prototype.hasOwnProperty.call(
+      req.body,
+      "jewelryOrder"
+    )
+    const hasServiceOrder = Object.prototype.hasOwnProperty.call(
+      req.body,
+      "serviceOrder"
+    )
 
-    const hasJewelryOrder = req.body.hasOwnProperty("jewelryOrder")
-    const hasServiceOrder = req.body.hasOwnProperty("serviceOrder")
+    let order = await Order.findOne({ _id: orderId, user: userId })
+      .populate("jewelryOrder.item")
+      .populate("serviceOrder.service")
+      .populate("shop")
 
-    const updatedJewelryFromClient = req.body.jewelryOrder || []
-    const updatedServicesFromClient = req.body.serviceOrder || []
-    const { notes, shop } = req.body
-
-    if (!hasJewelryOrder && !hasServiceOrder) {
-      console.log("hh")
-      return res.status(400).json({ message: "No valid order data provided." })
+    if (!order) {
+      return res.status(404).json({ message: "Order not found." })
     }
 
-    const order = await Order.findById(orderId)
-    if (!order) return res.status(404).json({ message: "Order not found." })
+    let newJewelryOrder = order.jewelryOrder || []
+    let newServiceOrder = order.serviceOrder || []
 
-    if (order.user.toString() !== userId)
-      return res.status(403).json({ message: "Unauthorized." })
-    // if (order.status !== "pending" && order.status !== "accepted")
-    //   return res
-    //     .status(400)
-    //     .json({ message: "Only pending orders can be updated." })
     if (hasJewelryOrder) {
-      const newJewelryOrder = []
+      const incomingJewelry = Array.isArray(req.body.jewelryOrder)
+        ? req.body.jewelryOrder
+        : []
 
-      for (const entry of updatedJewelryFromClient) {
-        const { item, itemModel, quantity, totalPrice, size } = entry
-
-        if (!itemModel) continue
-        if (!quantity || quantity <= 0) continue
-
-        let doc
-        if (itemModel === "Jewelry") doc = await Jewelry.findById(item)
-        if (itemModel === "Collection") doc = await Collection.findById(item)
-        if (!doc)
-          return res
-            .status(404)
-            .json({ message: `${itemModel} not found: ${item}` })
-
-        if (quantity > doc.limitPerOrder)
-          return res.status(400).json({
-            message: `Quantity exceeds limit for '${doc.name}'.`,
-          })
-
-        newJewelryOrder.push({
-          item,
-          itemModel,
-          quantity,
-          totalPrice,
-          ...(size ? { size } : {}),
-        })
-      }
-
-      order.jewelryOrder = newJewelryOrder
+      newJewelryOrder = incomingJewelry.map((entry) => ({
+        item:
+          typeof entry.item === "object" && entry.item !== null
+            ? entry.item._id
+            : entry.item,
+        itemModel: entry.itemModel,
+        quantity: entry.quantity ?? 1,
+        totalPrice: Number(entry.totalPrice || 0),
+        ...(entry.size ? { size: entry.size } : {}),
+      }))
     }
 
     if (hasServiceOrder) {
-      const newServiceOrder = []
+      const incomingService = Array.isArray(req.body.serviceOrder)
+        ? req.body.serviceOrder
+        : []
 
-      for (const s of updatedServicesFromClient) {
-        const { _id, service, jewelry = [], totalPrice } = s
-
-        const serviceDoc = await Service.findById(service)
-        if (!serviceDoc)
-          return res
-            .status(404)
-            .json({ message: `Service not found: ${service}` })
-
-        if (jewelry.length > serviceDoc.limitPerOrder)
-          return res.status(400).json({
-            message: `Too many jewelry items for service '${serviceDoc.name}'. Limit ${serviceDoc.limitPerOrder}.`,
-          })
-
-        const jewelryObjects = jewelry.map((j) => ({
+      newServiceOrder = incomingService.map((s) => ({
+        _id: s._id,
+        service:
+          typeof s.service === "object" && s.service !== null
+            ? s.service._id
+            : s.service,
+        totalPrice: Number(s.totalPrice || 0),
+        jewelry: (s.jewelry || []).map((j) => ({
           name: j.name || "",
           material: j.material || "",
           type: j.type || "",
           details: j.details || "",
-        }))
-
-        newServiceOrder.push({
-          _id,
-          service,
-          jewelry: jewelryObjects,
-          totalPrice,
-        })
-      }
-
-      order.serviceOrder = newServiceOrder
+        })),
+      }))
     }
 
-    if (shop) {
-      order.shop = shop
-    }
-    const finalJewelry = order.jewelryOrder
-    const finalServices = order.serviceOrder
-
-    order.totalPrice =
-      finalJewelry.reduce((sum, i) => sum + (i.totalPrice || 0), 0) +
-      finalServices.reduce((sum, s) => sum + (s.totalPrice || 0), 0)
-
-    if (notes !== undefined) order.notes = notes
-
-    await order.save()
-
-    const populatedOrder = await Order.findById(order._id).populate(
-      orderPopulateConfig
+    const subtotalJewelry = newJewelryOrder.reduce(
+      (sum, j) => sum + Number(j.totalPrice || 0),
+      0
+    )
+    const subtotalServices = newServiceOrder.reduce(
+      (sum, s) => sum + Number(s.totalPrice || 0),
+      0
     )
 
-    res.status(200).json({
-      message: "Order updated successfully",
-      order: populatedOrder,
-    })
+    const subtotal = subtotalJewelry + subtotalServices
+
+    const { collectionMethod, paymentMethod, address, notes, shop } = req.body
+
+    const isCheckoutStep = Boolean(paymentMethod || collectionMethod || address)
+
+    let finalCollectionMethod =
+      collectionMethod || order.collectionMethod || "delivery"
+
+    let finalTotalPrice = subtotal
+
+    if (isCheckoutStep) {
+      const vatAmount = subtotal * VAT_RATE
+      const deliveryFee =
+        finalCollectionMethod === "at-shop-collection" ? 0 : DELIVERY_FLAT
+
+      finalTotalPrice = subtotal + vatAmount + deliveryFee
+    }
+
+    order.jewelryOrder = newJewelryOrder
+    order.serviceOrder = newServiceOrder
+    order.totalPrice = finalTotalPrice
+
+    if (typeof notes !== "undefined") {
+      order.notes = notes
+    }
+
+    if (typeof shop !== "undefined") {
+      order.shop =
+        typeof shop === "object" && shop !== null ? shop._id || shop : shop
+    }
+
+    if (isCheckoutStep) {
+      order.collectionMethod = finalCollectionMethod
+      if (paymentMethod) order.paymentMethod = paymentMethod
+      if (address) order.address = address
+    }
+
+    const updated = await order.save()
+
+    const populated = await Order.findById(updated._id)
+      .populate("jewelryOrder.item")
+      .populate("serviceOrder.service")
+      .populate("shop")
+
+    return res.status(200).json({ order: populated })
   } catch (error) {
     console.error("Error updating order:", error)
-    res.status(500).json({ message: "Failed to update order" })
+    return res.status(500).json({ message: "Failed to update order." })
   }
 }
 
@@ -527,7 +529,6 @@ const updateOrderStatus = async (req, res) => {
     res.status(500).json({ message: "Failed to update order status" })
   }
 }
-
 
 const payOrder = async (req, res) => {
   try {

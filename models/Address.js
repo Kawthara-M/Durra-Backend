@@ -5,7 +5,7 @@ const AddressSchema = new mongoose.Schema({
   user: { type: Schema.Types.ObjectId, ref: "User", required: true },
   name: { type: String },
   road: { type: String },
-  building: { type: String },
+  block: { type: String },
   house: { type: String },
   area: { type: String },
   governante: { type: String },
