@@ -12,12 +12,29 @@ router.get(
   '/:id',
   deliveryCtrl.getDriver
 )
+
 router.post(
   '/',
   middleware.stripToken,
   middleware.verifyToken,
   middleware.isAdmin,
   deliveryCtrl.createDriver
+)
+
+router.put(
+  '/:driverId',
+  middleware.stripToken,
+  middleware.verifyToken,
+  middleware.isAdmin,
+  deliveryCtrl.updateDriver
+)
+
+router.delete(
+  '/:driverId',
+  middleware.stripToken,
+  middleware.verifyToken,
+  middleware.isAdmin,
+  deliveryCtrl.deleteDriver
 )
 
 

@@ -28,19 +28,51 @@ const getUserProfile = async (req, res) => {
 
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find()
+    const users = await User.find().lean() 
+    if (!users.length) {
+      return res.status(200).json({ users: [] })
+    }
+
+    const userIds = users.map((u) => u._id)
+
+    const shops = await Shop.find({ user: { $in: userIds } })
+      .select("_id user name")
+      .lean()
+
+    const drivers = await Driver.find({ user: { $in: userIds } })
+      .select("_id user licenseNo vehiclePlateNumber")
+      .lean()
+
+    const shopByUserId = {}
+    shops.forEach((s) => {
+      shopByUserId[s.user.toString()] = s
+    })
+
+    const driverByUserId = {}
+    drivers.forEach((d) => {
+      driverByUserId[d.user.toString()] = d
+    })
+
+    const usersWithRelations = users.map((u) => {
+      const id = u._id.toString()
+      return {
+        ...u,
+        shop: shopByUserId[id] || null,
+        driver: driverByUserId[id] || null,
+      }
+    })
 
     res.status(200).json({
-      users,
+      users: usersWithRelations,
     })
   } catch (error) {
+    console.error("Error fetching users:", error)
     return res.status(500).json({
-      error: "Failure encountred while fetching users.",
+      error: "Failure encountered while fetching users.",
     })
   }
 }
 
-// only for user data, data related to shop or deliveryman only should be in separate controller
 // tested! test again
 const updateUserProfile = async (req, res) => {
   try {

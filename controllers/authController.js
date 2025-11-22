@@ -222,7 +222,7 @@ const forgetPassword = async (req, res) => {
     await user.save()
 
     const resetUrl = `http://localhost:5173/set-password?token=${resetToken}`
-        await sendEmail({
+    await sendEmail({
       to: user.email,
       subject: "Reset Your Durra Password",
       html: `
@@ -255,7 +255,7 @@ const forgetPassword = async (req, res) => {
       </p>
 
       <div style="margin-top:2.5em; text-align:center;">
-        <img src="cid:durraLogo" alt="Durra Logo" style="max-width:40%; height:auto; opacity:0.9;" />
+        DURRA
       </div>
     </div>
   </div>

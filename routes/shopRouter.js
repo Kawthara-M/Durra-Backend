@@ -15,6 +15,7 @@ router.put(
   upload.single("image"),
   shopCtrl.updateShop
 )
+
 router.delete(
   "/:shopId",
   middleware.stripToken,

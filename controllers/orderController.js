@@ -378,7 +378,6 @@ const updateOrder = async (req, res) => {
   }
 }
 
-// not tested yet
 const activeTimers = new Map()
 
 const startJewelerTimeout = (orderId, minutes = 2) => {
@@ -505,6 +504,8 @@ const updateOrderStatus = async (req, res) => {
         currentLocation: null,
         status: "atShop",
       })
+
+      // should notify selected driver by email to come pick it up, we send shop address, and order address in email
     }
     if (newStatus === "out" && order.collectionMethod === "delivery") {
       const shipment = await Shipment.findOne({ order: orderId })
@@ -516,7 +517,7 @@ const updateOrderStatus = async (req, res) => {
       }
 
       shipment.pickedUpAt = new Date()
-      shipment.status = "shipped"
+      shipment.status = "out-for-shipping"
       await shipment.save()
     }
 

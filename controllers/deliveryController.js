@@ -1,5 +1,7 @@
 const crypto = require("crypto")
 const Driver = require("../models/Driver")
+const User = require("../models/User")
+const Shipment = require("../models/Shipment")
 const { createUser } = require("../services/userServices.js")
 const { sendEmail } = require("../services/emailService")
 
@@ -38,12 +40,12 @@ const getDriver = async (req, res) => {
 
 const createDriver = async (req, res) => {
   try {
-    const { fName, lName, address, email, phone, role, licenseNo, vehiclePlateNumber } = req.body
+    const { fName, lName, email, phone, role, licenseNo, vehiclePlateNumber } =
+      req.body
 
     const user = await createUser({
       fName,
       lName,
-      address,
       email,
       phone,
       role,
@@ -59,7 +61,7 @@ const createDriver = async (req, res) => {
     user.passwordResetExpires = Date.now() + 24 * 60 * 60 * 1000
     await user.save()
 
-    await Driver.create({
+    const newUser = await Driver.create({
       user: user._id,
       licenseNo: licenseNo || "",
       vehiclePlateNumber: vehiclePlateNumber || "",
@@ -67,18 +69,144 @@ const createDriver = async (req, res) => {
 
     const resetLink = `http://localhost:3010/auth/set-password?token=${resetToken}`
     // uncomment later so we dont spam
-    await sendEmail({
-      to: email,
-      subject: "Durra Account Activation",
-      text: `Greetings ${fName} ${lName},\n\nThanks for signing up as a Delivery provider. You have been assigned access to Durra platform, use this link ${resetLink} to set your password. Please make sure to update your password.\n\n- Durra Team`,
-    })
+    // await sendEmail({
+    //   to: email,
+    //   subject: "Durra Account Activation",
+    //   text: `Greetings ${fName} ${lName},\n\nThanks for signing up as a Delivery provider. You have been assigned access to Durra platform, use this link ${resetLink} to set your password. Please make sure to update your password.\n\n- Durra Team`,
+    // })
 
     return res.status(201).json({
       message: "DeliveryMan Successfully Created!",
-      userId: user._id,
+      user: newUser,
     })
   } catch (error) {
     return res.status(400).json({ error: error.message })
+  }
+}
+
+const updateDriver = async (req, res) => {
+  try {
+    const { driverId } = req.params
+    const { fName, lName, email, phone, licenseNo, vehiclePlateNumber } =
+      req.body
+    if (!driverId) {
+      return res
+        .status(400)
+        .json({ error: "No Driver ID provided for update." })
+    }
+
+    const driver = await Driver.findById(driverId)
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found." })
+    }
+
+    const user = await User.findById(driver.user)
+    if (!user) {
+      return res
+        .status(404)
+        .json({ error: "User associated with this driver not found." })
+    }
+
+    if (fName !== undefined) user.fName = fName
+    if (lName !== undefined) user.lName = lName
+    if (email !== undefined) user.email = email
+    if (phone !== undefined) user.phone = phone
+
+    if (licenseNo !== undefined) driver.licenseNo = licenseNo
+    if (vehiclePlateNumber !== undefined)
+      driver.vehiclePlateNumber = vehiclePlateNumber
+
+    await user.save()
+    await driver.save()
+
+    const updatedDriver = await Driver.findById(driverId).populate({
+      path: "user",
+      select: "fName lName email phone role",
+    })
+
+    return res.status(200).json({
+      message: "Driver updated successfully.",
+      driver: updatedDriver,
+    })
+  } catch (error) {
+    console.error("Error editing driver:", error)
+    return res.status(500).json({ error: error.message })
+  }
+}
+
+const deleteDriver = async (req, res) => {
+  try {
+    const { driverId } = req.params
+
+    if (!driverId) {
+      return res
+        .status(400)
+        .json({ error: "No Driver ID provided for deletion." })
+    }
+
+    const driver = await Driver.findById(driverId)
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found." })
+    }
+
+    const user = await User.findById(driver.user)
+
+    await Shipment.deleteMany({ driver: driverId })
+    await Driver.findByIdAndDelete(driverId)
+
+    if (user) {
+      await User.findByIdAndDelete(user._id)
+
+      await sendEmail({
+        to: user.email,
+        subject: "Your Durra Driver Account Has Been Removed",
+        html: `
+  <div style="font-family:Arial, sans-serif; background:#f7f7f7; padding:2em; color:#333;">
+    <div style="max-width:90%; margin:auto; background:#ffffff; padding:2.2em; border-radius:0.5em; border:0.07em solid #e8e8e8;">
+      
+      <h2 style="color:#6f0101; font-size:1.6em; text-align:center; margin-bottom:1.3em;">
+        Driver Account Removal Notice
+      </h2>
+
+      <p style="font-size:1em; line-height:1.6;">
+        Greetings ${user.fName},
+      </p>
+
+      <p style="font-size:1em; line-height:1.6; margin-bottom:.8em;">
+        Durra team would like to inform you that your <strong>Driver Account</strong> on the 
+        <strong>Durra Platform</strong> has been removed.
+      </p>
+
+      <p style="font-size:1em; line-height:1.6;">
+        This removal includes all data associated with your driver profile, including license information,
+        vehicle details, and associated delivery records.
+      </p>
+
+      <p style="font-size:1em; line-height:1.6; margin-top:1.4em;">
+        If you believe this action was a mistake or need further clarification, please feel free to contact our support team.
+      </p>
+
+      <p style="font-size:1em; margin-top:2em; font-weight:bold; text-align:center;">
+        Best regards,<br />
+        <span style="color:#6f0101;">Durra Team</span>
+      </p>
+
+      <div style="margin-top:2.5em; text-align:center;">
+        DURRA
+      </div>
+
+    </div>
+  </div>
+  `,
+      })
+    }
+
+    return res
+      .status(200)
+      .json({ message: "Driver and related data deleted successfully." })
+  } catch (error) {
+    console.error("Error deleting driver:", error)
+    return res.status(500).json({ error: error.message })
   }
 }
 
@@ -86,4 +214,6 @@ module.exports = {
   getAllDrivers,
   getDriver,
   createDriver,
+  updateDriver,
+  deleteDriver,
 }

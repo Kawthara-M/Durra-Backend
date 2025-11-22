@@ -148,8 +148,9 @@ const deleteShop = async (req, res) => {
 
     const user = await User.findById(shop.user)
 
-    await Jewelry.deleteMany({ shop: shopId })
     await Collection.deleteMany({ shop: shopId })
+    await Jewelry.deleteMany({ shop: shopId })
+    await Service.deleteMany({ shop: shopId })
     await Order.deleteMany({ shop: shopId })
     await Shop.findByIdAndDelete(shopId)
 
@@ -158,20 +159,49 @@ const deleteShop = async (req, res) => {
       await Request.deleteMany({ user: user._id })
       await User.findByIdAndDelete(user._id)
 
-      if (user.email) {
-        await sendEmail({
-          to: user.email,
-          subject: "Your Shop Has Been Deleted",
-          text: `Greetings,
+      await sendEmail({
+        to: user.email,
+        subject: "Your Durra Shop Has Been Removed",
+        html: `
+  <div style="font-family:Arial, sans-serif; background:#f7f7f7; padding:2em; color:#333;">
+    <div style="max-width:90%; margin:auto; background:#ffffff; padding:2.2em; border-radius:0.5em; border:0.07em solid #e8e8e8;">
+      
+      <h2 style="color:#6f0101; font-size:1.6em; text-align:center; margin-bottom:1.3em;">
+        Shop Deletion Notice
+      </h2>
 
-We would like to inform you that your shop "${shop.name}" has been successfully deleted from the Durra platform. All associated data, including products and orders, have also been removed.
+      <p style="font-size:1em; line-height:1.6;">
+        Greetings ${user.name},
+      </p>
 
-If you have any questions or concerns, feel free to contact our support team.
+      <p style="font-size:1em; line-height:1.6; margin-bottom:.8em;">
+        Durra team would like to inform you that your shop 
+        <strong>"${
+          shop.name
+        }"</strong> has been successfully removed from the <strong>Durra Platform</strong>.
+      </p>
 
-Best regards,  
-Durra Team`,
-        })
-      }
+      <p style="font-size:1em; line-height:1.6;">
+        All data related to your shop, including products, collections, services, and associated orders, have also been deleted from our system according to our platform policies.
+      </p>
+
+      <p style="font-size:1em; line-height:1.6; margin-top:1.4em;">
+        If you believe this action was taken in error or would like further clarification, please do not hesitate to contact our support team.
+      </p>
+
+      <p style="font-size:1em; margin-top:2em; font-weight:bold; text-align:center;">
+        Best regards,<br />
+        <span style="color:#6f0101;">Durra Team</span>
+      </p>
+
+      <div style="margin-top:2.5em; text-align:center;">
+        DURRA
+      </div>
+
+    </div>
+  </div>
+  `,
+      })
     }
 
     return res
