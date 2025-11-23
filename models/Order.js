@@ -9,6 +9,7 @@ const OrderSchema = new Schema(
       required: true,
     },
     shop: { type: Schema.Types.ObjectId, ref: "Shop", required: true },
+    driver: { type: Schema.Types.ObjectId, ref: "Driver" },
     serviceOrder: [
       {
         service: {

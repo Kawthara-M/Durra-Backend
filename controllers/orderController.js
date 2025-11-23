@@ -6,6 +6,10 @@ const Collection = require("../models/Collection")
 const Service = require("../models/Service")
 const Shipment = require("../models/Shipment")
 const Driver = require("../models/Driver")
+const crypto = require("crypto")
+
+const { sendEmail } = require("../services/emailService")
+
 
 const orderPopulateConfig = [
   {
@@ -406,12 +410,23 @@ const startJewelerTimeout = (orderId, minutes = 2) => {
   activeTimers.set(orderId, timer)
 }
 
-// tested until processing
+const formatAddress = (addr) => {
+  if (!addr) return "Address not available"
+  const parts = []
+
+  if (addr.governante || addr.governorate) {
+    parts.push(`${addr.governante || addr.governorate} Governorate`)
+  }
+  if (addr.area) parts.push(addr.area)
+  if (addr.road) parts.push(`Road ${addr.road}`)
+  if (addr.block) parts.push(`Block ${addr.block}`)
+  if (addr.house) parts.push(`House / Apartment ${addr.house}`)
+  return parts.filter(Boolean).join(", ")
+}
+
 const updateOrderStatus = async (req, res) => {
   try {
     const { orderId } = req.params
-
-    // we name it newStatus because we refer to status in code, so this is to distinguish between current and new status
     const { status: newStatus } = req.body
     const userId = res.locals.payload.id
     const role = res.locals.payload.role
@@ -421,6 +436,16 @@ const updateOrderStatus = async (req, res) => {
     }
 
     const order = await Order.findById(orderId)
+      .populate({
+        path: "shop",
+        populate: {
+          path: "user",
+          populate: { path: "defaultAddress", model: "Address" },
+        },
+      })
+      .populate("user")
+      .populate("address")
+
     if (!order) {
       return res.status(404).json({ message: "Order not found." })
     }
@@ -444,26 +469,25 @@ const updateOrderStatus = async (req, res) => {
       },
     }
 
-    // to get the allowed status transitions based on the user role and current status of the order
     const allowedTransitions = statusTransitions[role]?.[currentStatus] || []
 
     if (!allowedTransitions.includes(newStatus)) {
-      console.log(newStatus)
       return res.status(403).json({
         message: `${role} cannot change order from '${currentStatus}' to '${newStatus}'`,
       })
     }
 
     if (role === "Customer") {
-      if (order.user.toString() !== userId) {
+      console.log(order.user)
+      if (order.user._id.toString() !== userId) {
         return res
           .status(403)
           .json({ message: "Unauthorized to update this order." })
       }
     } else if (role === "Jeweler") {
       const shop = await Shop.findOne({ user: res.locals.payload.id })
-      if (order.shop.toString() !== shop._id.toString()) {
-        console.log("issue here")
+      console.log(order.shop)
+      if (!shop || order.shop._id.toString() !== shop._id.toString()) {
         return res
           .status(403)
           .json({ message: "Unauthorized: Not your order." })
@@ -475,26 +499,40 @@ const updateOrderStatus = async (req, res) => {
           .json({ message: "Unauthorized: Not assigned to this order." })
       }
     }
-    order.status = newStatus
 
+    // update status
+    order.status = newStatus
     await order.save()
 
     if (newStatus === "submitted") {
       startJewelerTimeout(orderId, 2)
     }
 
-    // not tested
+    // assign shipment to driver, update them, and update customer
     if (newStatus === "ready" && order.collectionMethod === "delivery") {
-      const drivers = await User.find({ role: "driver" })
+      const drivers = await User.find({ role: "Driver" })
       if (drivers.length === 0) {
         throw new Error("No delivery men available")
       }
 
       const randomIndex = Math.floor(Math.random() * drivers.length)
-      const assignedDriver = drivers[randomIndex]
+      const assignedDriverUser = drivers[randomIndex]
+
       const driver = await Driver.findOne({
-        user: assignedDriver._id,
+        user: assignedDriverUser._id,
       }).populate("user")
+
+      if (!driver) {
+        throw new Error("Selected driver profile not found")
+      }
+
+      const securityKey = crypto.randomInt(100000, 999999).toString()
+
+      const pickupAddress = order.shop?.user?.defaultAddress || null
+      const deliveryAddress = order.address || null
+
+      const pickupAddressText = formatAddress(pickupAddress)
+      const deliveryAddressText = formatAddress(deliveryAddress)
 
       const shipment = new Shipment({
         order: orderId,
@@ -502,11 +540,153 @@ const updateOrderStatus = async (req, res) => {
         pickedUpAt: null,
         deliveredAt: null,
         currentLocation: null,
+        securityKey,
         status: "atShop",
       })
 
-      // should notify selected driver by email to come pick it up, we send shop address, and order address in email
+      await shipment.save()
+// update link when frontend is ready
+
+      await sendEmail({
+        to: driver.user.email,
+        subject: "New Delivery Assigned - Durra",
+        html: `
+        <div style="font-family:Arial, sans-serif; background:#f7f7f7; padding:2em; color:#333;">
+          <div style="max-width:90%; margin:auto; background:#ffffff; padding:2.2em; border-radius:0.5em; border:0.07em solid #e8e8e8;">
+            <h2 style="color:#000; font-size:1.5em; margin-bottom:1em;">New Delivery Assigned</h2>
+            <p style="font-size:1em; line-height:1.6;">
+              Greetings ${driver.user.fName || "Driver"},
+            </p>
+            <p style="font-size:1em; line-height:1.6;">
+              A new order (<strong>#${
+                order._id
+              }</strong>) has been assigned to you for delivery.
+            </p>
+
+            <p style="font-size:1em; line-height:1.6;">
+              <strong>Pickup From:</strong><br/>
+              ${order.shop?.name || "Shop"}<br/>
+              ${pickupAddressText}
+            </p>
+
+            <p style="font-size:1em; line-height:1.6; margin-bottom:1em;">
+              <strong>Deliver To:</strong><br/>
+              ${order.user?.fName || ""} ${order.user?.lName || ""}<br/>
+              ${deliveryAddressText}
+            </p>
+
+            <p style="font-size:0.95em; line-height:1.6; margin-bottom:1.5em;">
+              When you reach the customer, please ask them for their <strong>secret delivery code</strong>
+              and enter it in the driver portal to confirm delivery. This code is sent only to the customer.
+            </p>
+            <a href="${process.env.DRIVER_PORTAL_URL || "#"}" style="
+              display:inline-block;
+              background:#6f0101;
+              color:#fff;
+              padding:0.8em 1.4em;
+              text-decoration:none;
+              font-weight:bold;
+              border-radius:0.4em;
+              margin-top:0.5em;
+            ">Open Driver Portal</a>
+
+            <p style="font-size:0.9em; color:#777; margin-top:2em;">
+              If you have any issues accessing the delivery details, please contact Durra support.
+            </p>
+
+            <div style="margin-top:2.5em; text-align:center;">
+            DURRA
+            </div>
+          </div>
+        </div>
+        `,
+      })
+
+      await sendEmail({
+        to: order.user.email,
+        subject: "Your Order is Ready for Delivery - Durra",
+        html: `
+        <div style="font-family:Arial, sans-serif; background:#f7f7f7; padding:2em; color:#333;">
+          <div style="max-width:90%; margin:auto; background:#ffffff; padding:2.2em; border-radius:0.5em; border:0.07em solid #e8e8e8;">
+            <h2 style="color:#000; font-size:1.5em; margin-bottom:1em;">Your Order is Ready</h2>
+
+            <p style="font-size:1em; line-height:1.6;">
+              Greetings ${order.user.fName || ""} ${order.user.lName || ""},
+            </p>
+
+            <p style="font-size:1em; line-height:1.6;">
+              Your order (<strong>#${
+                order._id
+              }</strong>) is ready and a driver has been assigned to deliver it to you.
+            </p>
+
+            <p style="font-size:1em; line-height:1.6; margin-top:1.2em;">
+              <strong>Delivery Address:</strong><br/>
+              ${deliveryAddressText}
+            </p>
+
+            <p style="font-size:0.95em; color:#555; line-height:1.6; margin-top:1.2em;">
+              Another email will be send when your order is <strong>out for delivery</strong>, including a secret delivery code
+              that you must give to the driver when you receive your items.
+            </p>
+
+            <p style="font-size:0.9em; color:#777; margin-top:2em;">
+              If you did not place this order or believe this is a mistake, please contact Durra support immediately.
+            </p>
+
+            <div style="margin-top:2.5em; text-align:center;">
+            DURRA
+            </div>
+          </div>
+        </div>
+        `,
+      })
     }
+
+    // update customer that their order is ready for colletion
+    if (
+      newStatus === "pickup" &&
+      order.collectionMethod === "at-shop-collection"
+    ) {
+      const pickupAddress = order.shop?.user?.defaultAddress || null
+      const pickupAddressText = formatAddress(pickupAddress)
+
+      await sendEmail({
+        to: order.user.email,
+        subject: "Your Order is Ready for Pick-up - Durra",
+        html: `
+        <div style="font-family:Arial, sans-serif; background:#f7f7f7; padding:2em; color:#333;">
+          <div style="max-width:90%; margin:auto; background:#ffffff; padding:2.2em; border-radius:0.5em; border:0.07em solid #e8e8e8;">
+            <h2 style="color:#000; font-size:1.5em; margin-bottom:1em;">Your Order is Ready</h2>
+
+            <p style="font-size:1em; line-height:1.6;">
+              Greetings ${order.user.fName || ""} ${order.user.lName || ""},
+            </p>
+
+            <p style="font-size:1em; line-height:1.6;">
+              Your order (<strong>#${
+                order._id
+              }</strong>) is ready for at shop collection.
+            </p>
+
+            <p style="font-size:1em; line-height:1.6; margin-top:1.2em;">
+              <strong>Pickup Address:</strong><br/>
+              ${pickupAddressText}
+            </p>
+
+            <p style="font-size:0.9em; color:#777; margin-top:2em;">
+              If you did not place this order or believe this is a mistake, please contact Durra support immediately.
+            </p>
+
+            <div style="margin-top:2.5em; text-align:center;">
+            DURRA
+            </div>
+          </div>
+        </div>
+        `,
+      })
+    }
+
     if (newStatus === "out" && order.collectionMethod === "delivery") {
       const shipment = await Shipment.findOne({ order: orderId })
 
@@ -519,9 +699,70 @@ const updateOrderStatus = async (req, res) => {
       shipment.pickedUpAt = new Date()
       shipment.status = "out-for-shipping"
       await shipment.save()
+
+      const pickupAddress = order.shop?.user?.defaultAddress || null
+      const deliveryAddress = order.address || null
+
+      const pickupAddressText = formatAddress(pickupAddress)
+      const deliveryAddressText = formatAddress(deliveryAddress)
+
+      await sendEmail({
+        to: order.user.email,
+        subject: "Your Order is Out for Delivery - Durra",
+        html: `
+        <div style="font-family:Arial, sans-serif; background:#f7f7f7; padding:2em; color:#333;">
+          <div style="max-width:90%; margin:auto; background:#ffffff; padding:2.2em; border-radius:0.5em; border:0.07em solid #e8e8e8;">
+            <h2 style="color:#000; font-size:1.5em; margin-bottom:1em;">Your Order is Out for Delivery</h2>
+
+            <p style="font-size:1em; line-height:1.6;">
+              Greetings ${order.user.fName || ""} ${order.user.lName || ""},
+            </p>
+
+            <p style="font-size:1em; line-height:1.6;">
+              Your order (<strong>#${
+                order._id
+              }</strong>) has been picked up by our driver and is now <strong>out for delivery</strong>.
+            </p>
+
+            <p style="font-size:1em; line-height:1.6; margin-top:1.2em;">
+              <strong>From:</strong><br/>
+              ${order.shop?.name || "Shop"}<br/>
+              ${pickupAddressText}
+            </p>
+
+            <p style="font-size:1em; line-height:1.6; margin-top:0.8em;">
+              <strong>To:</strong><br/>
+              ${deliveryAddressText}
+            </p>
+
+            <p style="font-size:1em; line-height:1.6; margin-top:1.2em;">
+              To protect your order, please only share the following <strong>secret code</strong> with the driver
+              after you receive your items:
+            </p>
+
+            <p style="font-size:1.6em; font-weight:bold; color:#6f0101; margin:0.8em 0;">
+              ${shipment.securityKey}
+            </p>
+
+            <p style="font-size:0.95em; color:#555; line-height:1.6;">
+              The driver will enter this code through their portal to confirm that the delivery is complete.
+              Do not share this code with anyone before the order arrives.
+            </p>
+
+            <p style="font-size:0.9em; color:#777; margin-top:2em;">
+              If you experience any issues with your delivery, please contact Durra support.
+            </p>
+
+            <div style="margin-top:2.5em; text-align:center;">
+              DURRA
+            </div>
+          </div>
+        </div>
+        `,
+      })
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       message: `Order status updated to '${newStatus}'.`,
       order,
     })
