@@ -9,13 +9,13 @@ const DriverSchema = new Schema(
       required: true,
       unique: true,
     },
-    licenseNo: {  
+    licenseNo: {
       type: String,
-      default: "",
+      required: true,
     },
     vehiclePlateNumber: {
       type: String,
-      default: "",
+      required: true,
     },
   },
   {
