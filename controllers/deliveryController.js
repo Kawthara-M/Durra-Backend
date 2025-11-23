@@ -40,15 +40,37 @@ const getDriver = async (req, res) => {
 
 const createDriver = async (req, res) => {
   try {
-    const { fName, lName, email, phone, role, licenseNo, vehiclePlateNumber } =
+    const { fName, lName, email, phone, licenseNo, vehiclePlateNumber } =
       req.body
 
-    const user = await createUser({
+    if (
+      !fName ||
+      !lName ||
+      !email ||
+      !phone ||
+      !licenseNo ||
+      !vehiclePlateNumber
+    ) {
+      return res.status(400).json({ error: "All fields are required." })
+    }
+
+    const existingUser = await User.findOne({ email })
+    if (existingUser) {
+      return res.status(400).json({ error: "Email is already in use." })
+    }
+
+    const user = await User.create({
       fName,
       lName,
       email,
       phone,
-      role,
+      role: "Driver",
+    })
+
+    const driver = await Driver.create({
+      user: user._id,
+      licenseNo,
+      vehiclePlateNumber,
     })
 
     const resetToken = crypto.randomBytes(32).toString("hex")
@@ -61,26 +83,72 @@ const createDriver = async (req, res) => {
     user.passwordResetExpires = Date.now() + 24 * 60 * 60 * 1000
     await user.save()
 
-    const newUser = await Driver.create({
-      user: user._id,
-      licenseNo: licenseNo || "",
-      vehiclePlateNumber: vehiclePlateNumber || "",
-    })
+    const activationUrl = `http://localhost:5173/set-password?token=${resetToken}`
 
-    const resetLink = `http://localhost:3010/auth/set-password?token=${resetToken}`
-    // uncomment later so we dont spam
-    // await sendEmail({
-    //   to: email,
-    //   subject: "Durra Account Activation",
-    //   text: `Greetings ${fName} ${lName},\n\nThanks for signing up as a Delivery provider. You have been assigned access to Durra platform, use this link ${resetLink} to set your password. Please make sure to update your password.\n\n- Durra Team`,
-    // })
+    await sendEmail({
+      to: user.email,
+      subject: "Activate Your Durra Driver Account",
+      html: `
+  <div style="font-family:Arial, sans-serif; background:#f7f7f7; padding:2em; color:#333;">
+    <div style="max-width:90%; margin:auto; background:#ffffff; padding:2.2em; border-radius:0.5em; border:0.07em solid #e8e8e8;">
+
+      <h2 style="color:#000; font-size:1.5em; margin-bottom:1em;">
+        Activate Your Driver Account
+      </h2>
+
+      <p style="font-size:1em; line-height:1.6;">
+        Greetings ${user.fName || ""} ${user.lName || ""},
+      </p>
+
+      <p style="font-size:1em; line-height:1.6; margin-bottom:1.5em;">
+        You have been registered as a driver on the <strong>Durra</strong> platform.
+        Please click the button below to set your account password and complete your setup.
+      </p>
+
+      <a href="${activationUrl}" style="
+        display:inline-block;
+        background:#6f0101;
+        color:#fff;
+        padding:0.8em 1.4em;
+        text-decoration:none;
+        font-weight:bold;
+        border-radius:0.4em;
+      ">
+        Set Password
+      </a>
+
+      <p style="font-size:0.9em; color:#777; margin-top:2em;">
+        If you were not expecting this email or believe this was sent in error,
+        please contact the Durra support team.
+      </p>
+
+      <div style="margin-top:2.5em; text-align:center;">
+        DURRA
+      </div>
+    </div>
+  </div>
+      `,
+    })
 
     return res.status(201).json({
-      message: "DeliveryMan Successfully Created!",
-      user: newUser,
+      message: "Driver created successfully.",
+      user: {
+        _id: user._id,
+        fName: user.fName,
+        lName: user.lName,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        driver: {
+          _id: driver._id,
+          licenseNo: driver.licenseNo,
+          vehiclePlateNumber: driver.vehiclePlateNumber,
+        },
+      },
     })
   } catch (error) {
-    return res.status(400).json({ error: error.message })
+    console.error("Error creating driver:", error)
+    return res.status(500).json({ error: "Failed to create driver." })
   }
 }
 

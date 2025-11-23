@@ -478,7 +478,6 @@ const updateOrderStatus = async (req, res) => {
     }
 
     if (role === "Customer") {
-      console.log(order.user)
       if (order.user._id.toString() !== userId) {
         return res
           .status(403)
@@ -545,7 +544,6 @@ const updateOrderStatus = async (req, res) => {
       })
 
       await shipment.save()
-// update link when frontend is ready
 
       await sendEmail({
         to: driver.user.email,
@@ -579,16 +577,6 @@ const updateOrderStatus = async (req, res) => {
               When you reach the customer, please ask them for their <strong>secret delivery code</strong>
               and enter it in the driver portal to confirm delivery. This code is sent only to the customer.
             </p>
-            <a href="${process.env.DRIVER_PORTAL_URL || "#"}" style="
-              display:inline-block;
-              background:#6f0101;
-              color:#fff;
-              padding:0.8em 1.4em;
-              text-decoration:none;
-              font-weight:bold;
-              border-radius:0.4em;
-              margin-top:0.5em;
-            ">Open Driver Portal</a>
 
             <p style="font-size:0.9em; color:#777; margin-top:2em;">
               If you have any issues accessing the delivery details, please contact Durra support.

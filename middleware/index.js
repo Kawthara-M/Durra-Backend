@@ -55,7 +55,6 @@ const verifyToken = (req, res, next) => {
 }
 
 const isAdmin = (req, res, next) => {
-  console.log(res.locals.payload)
   const user = res.locals.payload
   if (user && user.role === "Admin") {
     return next()
@@ -63,6 +62,7 @@ const isAdmin = (req, res, next) => {
     return res.status(403).json({ error: "Access denied: Admins only." })
   }
 }
+
 const isCustomer = (req, res, next) => {
   const user = res.locals.payload
   if (user && user.role === "Customer") {
@@ -71,6 +71,7 @@ const isCustomer = (req, res, next) => {
     return res.status(403).json({ error: "Access denied: Customers only." })
   }
 }
+
 const isJeweler = (req, res, next) => {
   const user = res.locals.payload
   if (user && user.role === "Jeweler") {
@@ -79,6 +80,7 @@ const isJeweler = (req, res, next) => {
     return res.status(403).json({ error: "Access denied: Jewelers only." })
   }
 }
+
 const isDeliveryMan = (req, res, next) => {
   const user = res.locals.payload
   if (user && user.role === "Driver") {
