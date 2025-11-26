@@ -154,6 +154,10 @@ const updateRequest = async (req, res) => {
       `,
         })
 
+        request.status = status
+        request.adminNote = adminNote || ""
+        await request.save()
+
         return res.status(201).json({
           message: "Shop Successfully Created!",
           userId: user._id,
