@@ -7,7 +7,7 @@ const getAllCollections = async (req, res) => {
   try {
     const payload = res.locals.payload
     let collections
-
+    console.log(payload)
     if (payload && payload.role === "Jeweler") {
       const shop = await Shop.findOne({ user: payload.id })
       if (!shop) {
@@ -15,7 +15,7 @@ const getAllCollections = async (req, res) => {
           .status(404)
           .json({ error: "Shop not found for this jeweler." })
       }
-
+      console.log(shop)
       collections = await Collection.find({ shop: shop._id })
         .populate("shop")
         .populate("jewelry")
@@ -29,6 +29,28 @@ const getAllCollections = async (req, res) => {
     return res.status(500).json({
       error: "Failure encountered while fetching collections.",
     })
+  }
+}
+
+const getCollectionForJeweler = async (req, res) => {
+  try {
+    const payload = res.locals.payload
+
+    const shop = await Shop.findOne({ user: payload.id })
+    if (!shop) {
+      return res.status(404).json({ error: "Shop not found for this jeweler." })
+    }
+    const collections = await Collection.find({
+      shop: shop._id,
+      deleted: false,
+    }).populate("shop")
+
+    return res.status(200).json({ collections })
+  } catch (error) {
+    console.error("Error fetching jeweler's jewelry:", error)
+    return res
+      .status(500)
+      .json({ error: "Failed to fetch collections for jeweler." })
   }
 }
 
@@ -242,6 +264,7 @@ const deleteCollection = async (req, res) => {
 module.exports = {
   getAllCollections,
   getCollection,
+  getCollectionForJeweler,
   createCollection,
   updateCollection,
   deleteCollection,

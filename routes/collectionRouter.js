@@ -5,6 +5,8 @@ const upload = require("../middleware/multer")
 
 router.get("/", collectionCtrl.getAllCollections)
 
+router.get("/shop", collectionCtrl.getCollectionForJeweler)
+
 router.get("/:collectionId", collectionCtrl.getCollection)
 
 router.post(

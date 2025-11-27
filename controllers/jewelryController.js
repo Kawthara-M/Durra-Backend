@@ -48,7 +48,6 @@ const getJewelry = async (req, res) => {
       _id: req.params.jewelryId,
       deleted: false,
     }).populate("shop")
-    console.log("here")
     if (!jewelry) {
       return res.status(404).json({
         error: "Jewelry not found. It may have been deleted or does not exist.",
