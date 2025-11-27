@@ -7,7 +7,13 @@ router.get("/", collectionCtrl.getAllCollections)
 
 router.get("/shop", collectionCtrl.getCollectionForJeweler)
 
-router.get("/:collectionId", collectionCtrl.getCollection)
+router.get(
+  "/:collectionId",
+  middleware.stripToken,
+  middleware.verifyToken,
+  middleware.isJeweler,
+  collectionCtrl.getCollection
+)
 
 router.post(
   "/",
