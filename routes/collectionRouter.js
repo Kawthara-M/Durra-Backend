@@ -5,13 +5,17 @@ const upload = require("../middleware/multer")
 
 router.get("/", collectionCtrl.getAllCollections)
 
-router.get("/shop", collectionCtrl.getCollectionForJeweler)
-
 router.get(
-  "/:collectionId",
+  "/shop",
   middleware.stripToken,
   middleware.verifyToken,
   middleware.isJeweler,
+  collectionCtrl.getCollectionForJeweler
+)
+
+router.get(
+  "/:collectionId",
+
   collectionCtrl.getCollection
 )
 

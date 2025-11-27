@@ -43,7 +43,7 @@ const getCollectionForJeweler = async (req, res) => {
     const collections = await Collection.find({
       shop: shop._id,
       deleted: false,
-    }).populate("shop")
+    }).populate("shop").populate("jewelry")
 
     return res.status(200).json({ collections })
   } catch (error) {
