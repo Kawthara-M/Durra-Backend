@@ -1,7 +1,6 @@
 const Shipment = require("../models/Shipment")
 const Driver = require("../models/Driver")
 
-
 const getShipments = async (req, res) => {
   try {
     const { id: userId } = res.locals.payload
@@ -26,7 +25,6 @@ const getShipments = async (req, res) => {
       ],
     })
 
-    console.log(shipments)
     res.status(200).json({ shipments })
   } catch (error) {
     console.error("Error fetching shipments:", error)
@@ -64,6 +62,20 @@ const getShipment = async (req, res) => {
       error: "Failure encountered while fetching shipment.",
     })
   }
+}
+
+const formatAddress = (address) => {
+  if (!address) return "Address not available"
+
+  const parts = [
+    address.governante && `${address.governante} Governorate`,
+    address.area,
+    address.road && `Road ${address.road}`,
+    address.block && `Block ${address.block}`,
+    address.house && `House ${address.house}`,
+  ].filter(Boolean)
+
+  return parts.join(", ")
 }
 
 const updateShipment = async (req, res) => {

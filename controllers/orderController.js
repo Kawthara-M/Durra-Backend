@@ -10,7 +10,6 @@ const crypto = require("crypto")
 
 const { sendEmail } = require("../services/emailService")
 
-
 const orderPopulateConfig = [
   {
     path: "jewelryOrder.item",
@@ -485,7 +484,6 @@ const updateOrderStatus = async (req, res) => {
       }
     } else if (role === "Jeweler") {
       const shop = await Shop.findOne({ user: res.locals.payload.id })
-      console.log(order.shop)
       if (!shop || order.shop._id.toString() !== shop._id.toString()) {
         return res
           .status(403)
@@ -499,7 +497,6 @@ const updateOrderStatus = async (req, res) => {
       }
     }
 
-    // update status
     order.status = newStatus
     await order.save()
 
@@ -507,7 +504,173 @@ const updateOrderStatus = async (req, res) => {
       startJewelerTimeout(orderId, 2)
     }
 
-    // assign shipment to driver, update them, and update customer
+    if (newStatus === "accepted" && (order.serviceOrder?.length || 0) > 0) {
+      const drivers = await User.find({ role: "Driver" })
+      if (drivers.length === 0) {
+        throw new Error("No delivery men available")
+      }
+
+      const randomIndex = Math.floor(Math.random() * drivers.length)
+      const assignedDriverUser = drivers[randomIndex]
+
+      const driver = await Driver.findOne({
+        user: assignedDriverUser._id,
+      }).populate("user")
+
+      if (!driver) {
+        throw new Error("Selected driver profile not found")
+      }
+
+      const pickupAddress = order.address || null
+      const deliveryAddress = order.shop?.user?.defaultAddress || null
+
+      const pickupAddressText = formatAddress(pickupAddress)
+      const deliveryAddressText = formatAddress(deliveryAddress)
+
+      const shipmentToShop = new Shipment({
+        order: orderId,
+        driver: driver._id,
+        pickedUpAt: null,
+        deliveredAt: null,
+        currentLocation: null,
+        status: "atCustomer",
+      })
+
+      await shipmentToShop.save()
+      await sendEmail({
+        to: driver.user.email,
+        subject: "New Pickup Assigned - Durra",
+        html: `
+        <div style="font-family:Arial, sans-serif; background:#f7f7f7; padding:2em; color:#333;">
+          <div style="max-width:90%; margin:auto; background:#ffffff; padding:2.2em; border-radius:0.5em; border:0.07em solid #e8e8e8;">
+            <h2 style="color:#000; font-size:1.5em; margin-bottom:1em;">New Pickup Assigned</h2>
+            <p style="font-size:1em; line-height:1.6;">
+              Greetings ${driver.user.fName || "Driver"},
+            </p>
+            <p style="font-size:1em; line-height:1.6;">
+              A new service order (<strong>#${
+                order._id
+              }</strong>) has been assigned to you.
+            </p>
+
+            <p style="font-size:1em; line-height:1.6;">
+              <strong>Pickup From (Customer):</strong><br/>
+              ${order.user?.fName || ""} ${order.user?.lName || ""}<br/>
+              ${pickupAddressText}
+            </p>
+
+            <p style="font-size:1em; line-height:1.6; margin-bottom:1em;">
+              <strong>Deliver To (Shop):</strong><br/>
+              ${order.shop?.name || "Shop"}<br/>
+              ${deliveryAddressText}
+            </p>
+
+            <p style="font-size:0.95em; line-height:1.6; margin-bottom:1.5em;">
+              Please collect the customer's jewelry safely and deliver it to the shop listed above.
+            </p>
+
+            <p style="font-size:0.9em; color:#777; margin-top:2em;">
+              If you have any issues accessing the delivery details, please contact Durra support.
+            </p>
+
+            <div style="margin-top:2.5em; text-align:center;">
+            DURRA
+            </div>
+          </div>
+        </div>
+        `,
+      })
+
+      await sendEmail({
+        to: order.user.email,
+        subject: "Driver Assigned to Pick Up Your Jewelry - Durra",
+        html: `
+        <div style="font-family:Arial, sans-serif; background:#f7f7f7; padding:2em; color:#333;">
+          <div style="max-width:90%; margin:auto; background:#ffffff; padding:2.2em; border-radius:0.5em; border:0.07em solid #e8e8e8;">
+            <h2 style="color:#000; font-size:1.5em; margin-bottom:1em;">Pickup Scheduled</h2>
+
+            <p style="font-size:1em; line-height:1.6;">
+              Greetings ${order.user.fName || ""} ${order.user.lName || ""},
+            </p>
+
+            <p style="font-size:1em; line-height:1.6;">
+              Your service order (<strong>#${
+                order._id
+              }</strong>) has been accepted. A driver has been assigned to
+              pick up your jewelry and deliver it to <strong>${
+                order.shop?.name || "the jeweler"
+              }</strong>.
+            </p>
+
+            <p style="font-size:1em; line-height:1.6; margin-top:1.2em;">
+              <strong>Pickup Address:</strong><br/>
+              ${pickupAddressText}
+            </p>
+
+            <p style="font-size:0.95em; color:#555; line-height:1.6; margin-top:1.2em;">
+              Please ensure your jewelry is safely packed and ready to hand over when the driver arrives.
+            </p>
+
+            <p style="font-size:0.9em; color:#777; margin-top:2em;">
+              If you did not request this service or believe this is a mistake, please contact Durra support immediately.
+            </p>
+
+            <div style="margin-top:2.5em; text-align:center;">
+            DURRA
+            </div>
+          </div>
+        </div>
+        `,
+      })
+    }
+
+    if (newStatus === "processing" && (order.serviceOrder?.length || 0) > 0) {
+      const shipmentToShop = await Shipment.findOne({
+        order: orderId,
+        status: { $in: ["atCustomer", "out-for-shipping"] },
+      }).sort({ createdAt: -1 })
+
+      if (shipmentToShop) {
+        shipmentToShop.status = "received-by-shop"
+        shipmentToShop.deliveredAt = new Date()
+        await shipmentToShop.save()
+      }
+
+      await sendEmail({
+        to: order.user.email,
+        subject: "Your Jewelry Has Been Received by the Jeweler - Durra",
+        html: `
+        <div style="font-family:Arial, sans-serif; background:#f7f7f7; padding:2em; color:#333;">
+          <div style="max-width:90%; margin:auto; background:#ffffff; padding:2.2em; border-radius:0.5em; border:0.07em solid #e8e8e8;">
+            <h2 style="color:#000; font-size:1.5em; margin-bottom:1em;">Your Jewelry is Being Processed</h2>
+
+            <p style="font-size:1em; line-height:1.6;">
+              Greetings ${order.user.fName || ""} ${order.user.lName || ""},
+            </p>
+
+            <p style="font-size:1em; line-height:1.6;">
+              We would like to inform you that your jewelry for service order
+              (<strong>#${order._id}</strong>) has been safely received by
+              <strong>${order.shop?.name || "the jeweler"}</strong>.
+            </p>
+
+            <p style="font-size:1em; line-height:1.6; margin-top:1.2em;">
+              The jeweler has started <strong>processing your service request</strong>.
+            </p>
+
+            <p style="font-size:0.9em; color:#777; margin-top:2em;">
+              We will notify you once your jewelry is ready.
+            </p>
+
+            <div style="margin-top:2.5em; text-align:center;">
+            DURRA
+            </div>
+          </div>
+        </div>
+        `,
+      })
+    }
+
     if (newStatus === "ready" && order.collectionMethod === "delivery") {
       const drivers = await User.find({ role: "Driver" })
       if (drivers.length === 0) {
@@ -592,7 +755,7 @@ const updateOrderStatus = async (req, res) => {
 
       await sendEmail({
         to: order.user.email,
-        subject: "Your Order is Ready for Delivery - Durra",
+        subject: "Your Order is Ready for Delivery",
         html: `
         <div style="font-family:Arial, sans-serif; background:#f7f7f7; padding:2em; color:#333;">
           <div style="max-width:90%; margin:auto; background:#ffffff; padding:2.2em; border-radius:0.5em; border:0.07em solid #e8e8e8;">
@@ -631,7 +794,6 @@ const updateOrderStatus = async (req, res) => {
       })
     }
 
-    // update customer that their order is ready for colletion
     if (
       newStatus === "pickup" &&
       order.collectionMethod === "at-shop-collection"
@@ -676,7 +838,10 @@ const updateOrderStatus = async (req, res) => {
     }
 
     if (newStatus === "out" && order.collectionMethod === "delivery") {
-      const shipment = await Shipment.findOne({ order: orderId })
+      const shipment = await Shipment.findOne({
+        order: orderId,
+        status: "atShop",
+      }).sort({ createdAt: -1 })
 
       if (!shipment) {
         return res
@@ -696,7 +861,7 @@ const updateOrderStatus = async (req, res) => {
 
       await sendEmail({
         to: order.user.email,
-        subject: "Your Order is Out for Delivery - Durra",
+        subject: "Your Order is Out for Delivery",
         html: `
         <div style="font-family:Arial, sans-serif; background:#f7f7f7; padding:2em; color:#333;">
           <div style="max-width:90%; margin:auto; background:#ffffff; padding:2.2em; border-radius:0.5em; border:0.07em solid #e8e8e8;">
@@ -783,34 +948,6 @@ const payOrder = async (req, res) => {
     if (order.paymentStatus === "Paid") {
       return res.status(400).json({ message: "Order already paid." })
     }
-
-    // verification
-    // if (amount != null) {
-    //   const jewelrySubtotal = (order.jewelryOrder || []).reduce(
-    //     (sum, j) => sum + (j.totalPrice || 0),
-    //     0
-    //   )
-    //   const serviceSubtotal = (order.serviceOrder || []).reduce(
-    //     (sum, s) => sum + (s.totalPrice || 0),
-    //     0
-    //   )
-    //   const baseSubtotal = jewelrySubtotal + serviceSubtotal
-
-    //   const VAT_RATE = 0.1
-    //   const DELIVERY_FLAT_RATE = 2
-    //   const deliveryFee =
-    //     order.collectionMethod === "delivery" ? DELIVERY_FLAT_RATE : 0
-    //   const vatAmount = baseSubtotal * VAT_RATE
-    //   const expectedTotal = baseSubtotal + vatAmount + deliveryFee
-
-    //   const diff = Math.abs(Number(amount) - Number(expectedTotal))
-    //   if (diff > 0.005) {
-    //     return res.status(400).json({
-    //       message: "Payment amount mismatch.",
-    //       expectedTotal: expectedTotal.toFixed(3),
-    //     })
-    //   }
-    // }
 
     order.paymentStatus = "Paid"
     order.paymentMethod = paymentMethod
