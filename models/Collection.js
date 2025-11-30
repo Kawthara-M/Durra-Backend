@@ -9,7 +9,6 @@ const CollectionSchema = new Schema(
     },
     description: {
       type: String,
-      required: true,
     },
     shop: {
       type: Schema.Types.ObjectId,

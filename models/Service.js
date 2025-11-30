@@ -32,7 +32,6 @@ const ServiceSchema = new Schema(
         // required: true,
       },
     ],
-    // to enable soft delete
     deleted: {
       type: Boolean,
       default: false, 

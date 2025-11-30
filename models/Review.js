@@ -20,7 +20,7 @@ const ReviewSchema = new Schema(
     },
     comment: {
       type: String,
-      required:true,
+      required: true,
     },
   },
   { timestamps: true }

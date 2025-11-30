@@ -9,12 +9,14 @@ const ShopSchema = new Schema(
       required: true,
       unique: true,
     },
-    name: {  
+    name: {
       type: String,
+      required: true,
       default: "",
     },
     cr: {
       type: String,
+      required: true,
       default: "",
     },
     description: {
