@@ -248,7 +248,6 @@ const createRequest = async (req, res) => {
     }
 
     const { email, phone, address } = details
-    console.log(req.body)
 
     const user = await createUser({
       email,

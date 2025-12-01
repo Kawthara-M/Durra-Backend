@@ -9,13 +9,14 @@ const { sendEmail } = require("../services/emailService")
 // style the email
 const SignUp = async (req, res) => {
   try {
-    const { fName, lName, email, phone, password, confirmPassword, role } =
+    let { fName, lName, email, phone, password, confirmPassword, role } =
       req.body
 
     if (password !== confirmPassword) {
       return res.status(400).json({ error: "Passwords must match!" })
     }
 
+    email = email.trim().toLowerCase()
     const user = await createUser({
       fName,
       lName,
@@ -25,11 +26,51 @@ const SignUp = async (req, res) => {
       role,
     })
 
-    // await sendEmail({
-    //   to: email,
-    //   subject: "Welcome to Durra!",
-    //   text: `Greetings ${fName},\n\nWelcome to Durra! Your account has been successfully created and approved.\n\nYou can now log in and start using our services.\n\n- Durra Team`,
-    // })
+    const activationUrl = `http://localhost:5173`
+
+    await sendEmail({
+      to: email,
+      subject: "Welcome to Durra!",
+      html: `
+  <div style="font-family:Arial, sans-serif; background:#f7f7f7; padding:2em; color:#333;">
+    <div style="max-width:90%; margin:auto; background:#ffffff; padding:2.2em; border-radius:0.5em; border:0.07em solid #e8e8e8;">
+
+      <h2 style="color:#000; font-size:1.5em; margin-bottom:1em;">
+        Welcome to Durra
+      </h2>
+
+      <p style="font-size:1em; line-height:1.6;">
+        Greetings ${fName || "Valued Customer"},
+      </p>
+
+      <p style="font-size:1em; line-height:1.6; margin-bottom:1.5em;">
+        Thank you for signing up with Durra! Your account has been successfully created, and you can now log in to explore our collections, place orders, and manage your jewelry services.
+      </p>
+
+      <a href="${activationUrl}/sign-in" style="
+        display:inline-block;
+        background:#6f0101;
+        color:#fff;
+        padding:0.8em 1.4em;
+        text-decoration:none;
+        font-weight:bold;
+        border-radius:0.4em;
+      ">
+        Log In to Durra
+      </a>
+
+      <p style="font-size:0.9em; color:#777; margin-top:2em;">
+        If you did not create this account or believe this was done in error, please contact our support team immediately.
+      </p>
+
+      <div style="margin-top:2.5em; text-align:center; font-weight:bold; color:#6f0101;">
+        DURRA
+      </div>
+
+    </div>
+  </div>
+  `,
+    })
 
     return res.status(201).json({
       message: "Signup successful!",
@@ -43,7 +84,8 @@ const SignUp = async (req, res) => {
 // tested for Admin, Jeweler, and Customer
 const SignIn = async (req, res) => {
   try {
-    const { email, password } = req.body
+    let { email, password } = req.body
+    email = email.trim().toLowerCase()
     const user = await User.findOne({ email })
 
     if (user) {
