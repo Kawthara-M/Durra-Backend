@@ -5,8 +5,6 @@ const validatePassword = require("../validators/passwordValidator.js")
 const { createUser } = require("../services/userServices.js")
 const { sendEmail } = require("../services/emailService")
 
-// tested: I created an admin user, a jeweler user, and a customer user
-// style the email
 const SignUp = async (req, res) => {
   try {
     let { fName, lName, email, phone, password, confirmPassword, role } =
