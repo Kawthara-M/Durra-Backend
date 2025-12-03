@@ -2,7 +2,6 @@ const Jewelry = require("../models/Jewelry")
 const Service = require("../models/Service")
 const Shop = require("../models/Shop")
 const Collection = require("../models/Collection")
-const Address = require("../models/Address") // ⬅️ NEW
 
 const searchAll = async (req, res) => {
   try {
