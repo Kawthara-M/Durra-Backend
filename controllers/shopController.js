@@ -12,14 +12,18 @@ const { sendEmail } = require("../services/emailService")
 // tested
 const getAllShops = async (req, res) => {
   try {
-    const shops = await Shop.find().populate("user")
+    const shops = await Shop.find().populate({
+      path: "user",
+      populate: { path: "defaultAddress" }, 
+    })
 
     res.status(200).json({
       shops,
     })
   } catch (error) {
+    console.error("Error fetching shops:", error)
     return res.status(500).json({
-      error: "Failure encountred while fetching shops.",
+      error: "Failure encountered while fetching shops.",
     })
   }
 }
@@ -79,7 +83,7 @@ const getProducts = async (req, res) => {
   }
 }
 
-//should test
+// tesetd
 const updateShop = async (req, res) => {
   try {
     const { shopId } = req.params
@@ -176,9 +180,7 @@ const deleteShop = async (req, res) => {
 
       <p style="font-size:1em; line-height:1.6; margin-bottom:.8em;">
         Durra team would like to inform you that your shop 
-        <strong>"${
-          shop.name
-        }"</strong> has been successfully removed from the <strong>Durra Platform</strong>.
+        <strong>"${shop.name}"</strong> has been successfully removed from the <strong>Durra Platform</strong>.
       </p>
 
       <p style="font-size:1em; line-height:1.6;">

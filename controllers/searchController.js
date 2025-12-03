@@ -2,6 +2,7 @@ const Jewelry = require("../models/Jewelry")
 const Service = require("../models/Service")
 const Shop = require("../models/Shop")
 const Collection = require("../models/Collection")
+const Address = require("../models/Address") // ⬅️ NEW
 
 const searchAll = async (req, res) => {
   try {
@@ -62,7 +63,7 @@ const searchAll = async (req, res) => {
       $or: [...regexQueries.map((regex) => ({ name: regex }))],
     }
 
-    const [jewelryResults, serviceResults, collectionResults, shopResults] =
+    const [jewelryResults, serviceResults, collectionResults, rawShopResults] =
       await Promise.all([
         Jewelry.find(jewelryQuery).populate("shop"),
         Service.find(serviceQuery).populate("shop"),
@@ -75,8 +76,17 @@ const searchAll = async (req, res) => {
             "otherMaterials",
           ],
         }),
-        Shop.find(shopQuery),
+        Shop.find(shopQuery)
+          .populate({
+            path: "user",
+            populate: { path: "defaultAddress" }, 
+          })
+          .lean(),
       ])
+
+    const shopResults = rawShopResults.map((shop) => ({
+      ...shop,
+    }))
 
     const results = {
       jewelry: jewelryResults,
