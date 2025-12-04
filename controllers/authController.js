@@ -79,7 +79,7 @@ const SignUp = async (req, res) => {
   }
 }
 
-// tested for Admin, Jeweler, and Customer
+// tested
 const SignIn = async (req, res) => {
   try {
     let { email, password } = req.body

@@ -6,9 +6,10 @@ const { verifyDanatReport } = require("../services/certificationServices.js")
 // tested
 const getAllJewelry = async (req, res) => {
   try {
-    let jewelry
-
-    jewelry = await Jewelry.find({ deleted: false }).populate("shop")
+    const jewelry = await Jewelry.find({
+      deleted: false,
+      limitPerOrder: { $gt: 0 }, // gt stands for greater than
+    }).populate("shop")
 
     res.status(200).json({ jewelry })
   } catch (error) {
@@ -21,7 +22,7 @@ const getAllJewelry = async (req, res) => {
 
 const getJewelryForJeweler = async (req, res) => {
   try {
-    const payload = res.locals.payload 
+    const payload = res.locals.payload
 
     const shop = await Shop.findOne({ user: payload.id })
     if (!shop) {
@@ -82,8 +83,6 @@ const getJewelryByShop = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message })
   }
 }
-
-const validateGIA = async () => {}
 
 const createJewelry = async (req, res) => {
   try {
