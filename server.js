@@ -53,6 +53,7 @@ const deliveryRouter = require("./routes/deliveryRouter")
 const shipmentsRouter = require("./routes/shipmentsRouter")
 const searchRouter = require("./routes/searchRouter")
 const pricesRouter = require("./routes/pricesRouter")
+const contactRouter = require("./routes/contactRouter")
 
 // use Routers
 app.use("/auth", authRouter)
@@ -71,6 +72,7 @@ app.use("/drivers", deliveryRouter)
 app.use("/shipments", shipmentsRouter)
 app.use("/search", searchRouter)
 app.use("/metal-prices", pricesRouter)
+app.use("/contact-us", contactRouter)
 
 // Listener
 app.listen(port, () => {
