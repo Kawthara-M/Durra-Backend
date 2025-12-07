@@ -915,6 +915,10 @@ const updateOrderStatus = async (req, res) => {
       })
     }
 
+    if (newStatus === "picked-up") {
+      order.paymentStatus = "paid"
+    }
+
     return res.status(200).json({
       message: `Order status updated to '${newStatus}'.`,
       order,
@@ -928,7 +932,7 @@ const updateOrderStatus = async (req, res) => {
 const payOrder = async (req, res) => {
   try {
     const { orderId } = req.params
-    const { paymentMethod = "Card", amount } = req.body || {}
+    const { paymentMethod = "Card" } = req.body || {}
     const order = await Order.findById(orderId)
 
     if (!order) {
