@@ -2,7 +2,7 @@ const User = require("../models/User")
 const Driver = require("../models/Driver")
 const Shop = require("../models/Shop")
 
-// tested for admin, customer, and jeweler
+// tested!
 const getUserProfile = async (req, res) => {
   try {
     const user = await User.findById(res.locals.payload.id)
@@ -73,7 +73,7 @@ const getAllUsers = async (req, res) => {
   }
 }
 
-// tested! test again
+// tested! 
 const updateUserProfile = async (req, res) => {
   try {
     const { fName, lName, email, phone } = req.body

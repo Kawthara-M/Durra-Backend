@@ -9,7 +9,6 @@ const { createUser } = require("../services/userServices")
 const getAllRequests = async (req, res) => {
   try {
     const requests = await Request.find().populate("user")
-    console.log(requests)
 
     res.status(200).json({ requests })
   } catch (error) {

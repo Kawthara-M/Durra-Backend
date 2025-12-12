@@ -87,7 +87,7 @@ const OrderSchema = new Schema(
         "delivered", // received by customer
         "picked-up",
         "cancelled", // customer cancelled before shop decides
-      ], // ensure they are correct
+      ], 
       default: "pending",
     },
     paymentStatus: {

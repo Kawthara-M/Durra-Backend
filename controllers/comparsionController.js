@@ -40,8 +40,6 @@ const createComparsion = async (req, res) => {
     const userId = res.locals.payload.id
     const { jewelryId } = req.body
 
-    console.log(jewelryId)
-
     if (!jewelryId) {
       return res.status(400).json({ error: "jewelryId is required." })
     }

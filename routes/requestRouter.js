@@ -31,7 +31,6 @@ router.post(
   requestCtrl.createRequest
 )
 
-// I think we should restrict access to admins
 router.put(
   "/:requestId",
   middleware.stripToken,

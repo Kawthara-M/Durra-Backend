@@ -66,7 +66,6 @@ const getAllOrders = async (req, res) => {
         .populate("jewelryOrder")
         .populate("serviceOrder")
         .populate("shop")
-      console.log(orders.length)
     } else if (role === "Driver") {
       orders = await Order.find().populate("user")
     } else {
@@ -395,9 +394,9 @@ const startJewelerTimeout = (orderId, minutes = 2) => {
       if (order && order.status === "submitted") {
         order.status = "pending"
         await order.save()
-        console.log(
-          ` Order ${orderId} reverted back to pending (jeweler timeout).`
-        )
+        // console.log(
+        //   ` Order ${orderId} reverted back to pending (jeweler timeout).`
+        // )
       }
     } catch (err) {
       console.error("Timeout revert failed:", err)

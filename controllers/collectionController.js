@@ -7,7 +7,6 @@ const getAllCollections = async (req, res) => {
   try {
     const payload = res.locals.payload
     let collections
-    console.log(payload)
     if (payload && payload.role === "Jeweler") {
       const shop = await Shop.findOne({ user: payload.id })
       if (!shop) {
@@ -15,7 +14,6 @@ const getAllCollections = async (req, res) => {
           .status(404)
           .json({ error: "Shop not found for this jeweler." })
       }
-      console.log(shop)
       collections = await Collection.find({ shop: shop._id })
         .populate("shop")
         .populate("jewelry")
